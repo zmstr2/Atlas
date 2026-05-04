@@ -13,6 +13,7 @@ if (typeof window !== 'undefined') {
     capture_pageview: false,
     capture_pageleave: true,
   });
+  posthog.register({ app: 'atlas' });
 }
 
 function PageViewTracker() {
