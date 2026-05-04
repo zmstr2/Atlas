@@ -119,7 +119,7 @@ CALL RULES
 export const PERSONAS: Record<PersonaId, PersonaConfig> = {
   jordan: {
     id: 'jordan',
-    displayName: 'Jordan Hayes — VP Marketing, MidCo',
+    displayName: 'Jordan Hayes',
     voice: 'echo',
     leadId: 'jordan-hayes',
     systemPrompt: JORDAN_PROMPT,

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import posthog from 'posthog-js';
 
 export function PostCallRating({
   personaName,
@@ -15,6 +16,7 @@ export function PostCallRating({
   const active = hovered || selected;
 
   const handleSubmit = () => {
+    posthog.capture('call_rated', { rating: selected, persona_name: personaName });
     setSubmitted(true);
     setTimeout(onDone, 1200);
   };
@@ -82,7 +84,7 @@ export function PostCallRating({
         </button>
 
         <button
-          onClick={onDone}
+          onClick={() => { posthog.capture('call_rating_skipped', { persona_name: personaName }); onDone(); }}
           className="text-fg-muted text-xs hover:text-fg-secondary transition"
         >
           Skip

@@ -175,11 +175,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
+const EMPTY_AXIS: AxisCard = { state: 'unknown', headline: null, detail: null, anchorTurnId: null };
 const EMPTY_BANT: Record<string, AxisCard> = {
-  need: { state: 'unknown' },
-  budget: { state: 'unknown' },
-  authority: { state: 'unknown' },
-  timeline: { state: 'unknown' },
+  need: EMPTY_AXIS,
+  budget: EMPTY_AXIS,
+  authority: EMPTY_AXIS,
+  timeline: EMPTY_AXIS,
 };
 
 export function MemoryPanel({

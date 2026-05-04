@@ -9,3 +9,4 @@ apps/agent/transcripts/
 .env.*.local
 /tmp/
 .gstack/
+.vercel

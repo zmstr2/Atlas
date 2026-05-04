@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { DM_Sans, Instrument_Serif } from 'next/font/google';
 import '../styles/globals.css';
 import 'streamdown/styles.css';
+import { PostHogProvider } from './providers';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -17,14 +18,16 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: 'Atlas — Live Sales Call Agent',
-  description: 'Real-time AI coaching that generates training data for Ava.',
+  title: 'Atlas',
+  description: 'Win more calls with Atlas.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${dmSans.variable} ${instrumentSerif.variable}`}>
-      <body>{children}</body>
+      <body>
+        <PostHogProvider>{children}</PostHogProvider>
+      </body>
     </html>
   );
 }

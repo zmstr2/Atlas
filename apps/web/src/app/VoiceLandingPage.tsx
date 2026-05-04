@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { nanoid } from 'nanoid';
+import posthog from 'posthog-js';
 import type { PersonaId } from '@atlas/types';
 import { CallStage } from '@/components/voice/CallStage';
 
@@ -88,7 +89,11 @@ export default function VoiceLandingPage() {
     );
   }
 
-  const startCall = () => setActive({ callId: `call_${nanoid(10)}`, personaId: 'jordan' });
+  const startCall = () => {
+    const callId = `call_${nanoid(10)}`;
+    posthog.capture('call_started', { call_id: callId, persona_id: 'jordan' });
+    setActive({ callId, personaId: 'jordan' });
+  };
 
   // Jordan lives on whatever day is "today" so the demo always feels current.
   const eventsByDay: Record<DayKey, CalendarEvent[]> = { ...EVENTS };

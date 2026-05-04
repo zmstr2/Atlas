@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import posthog from 'posthog-js';
 import type { PersonaId, MeetingMemory, CallFactsUI } from '@atlas/types';
 import { lookupLead, lookupCompany } from '@atlas/types';
 import { connectRealtime, type RealtimeClient, type RealtimeSessionInfo } from '@/lib/realtime/client';
@@ -37,6 +38,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
   const sseCleanupRef = useRef<(() => void) | null>(null);
   const [memory, setMemory] = useState<MeetingMemory | null>(null);
   const [factsUI, setFactsUI] = useState<CallFactsUI | null>(null);
+  const callStartRef = useRef<number>(Date.now());
 
   const onResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -128,6 +130,11 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
   }, [remoteStream]);
 
   const hangup = () => {
+    posthog.capture('call_ended', {
+      call_id: callId,
+      persona_id: personaId,
+      duration_seconds: Math.round((Date.now() - callStartRef.current) / 1000),
+    });
     coachEndCall();
     realtimeRef.current?.hangup();
     realtimeRef.current = null;

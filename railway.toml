@@ -1,0 +1,7 @@
+[build]
+buildCommand = "bun install"
+
+[deploy]
+startCommand = "bun run apps/agent/src/index.ts"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
