@@ -1,0 +1,16 @@
+{
+  "name": "atlas",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "bun run --filter='*' dev",
+    "dev:agent": "bun run --filter='@atlas/agent' dev",
+    "dev:web": "bun run --filter='@atlas/web' dev",
+    "build": "bun run --filter='*' build",
+    "test": "bun run --filter='*' test",
+    "typecheck": "bun run --filter='*' typecheck",
+    "smoke": "bun run scripts/smoke.ts",
+    "dump-call": "bun run scripts/dump-call.ts",
+    "test:suggesters": "bun run scripts/test-suggesters.ts"
+  }
+}

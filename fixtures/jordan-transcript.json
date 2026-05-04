@@ -1,0 +1,162 @@
+[
+  {
+    "id": "u1",
+    "speaker": "rep",
+    "text": "Hi Jordan, thanks for taking the time today. I'm Alex from Artisan. Quick housekeeping — I may take a few notes as we go, hope that's alright.",
+    "startMs": 0,
+    "endMs": 8500,
+    "confidence": 0.99
+  },
+  {
+    "id": "u2",
+    "speaker": "customer",
+    "text": "Of course, no problem. Yeah, Jordan Hayes — VP Marketing here at MidCo. We're about 130 people, B2B SaaS, been around about four years.",
+    "startMs": 9000,
+    "endMs": 20000,
+    "confidence": 0.98
+  },
+  {
+    "id": "u3",
+    "speaker": "rep",
+    "text": "Great. So you clicked through our workflow automation case study last week — what was the context there? What's prompting the look at outbound right now?",
+    "startMs": 21000,
+    "endMs": 31000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u4",
+    "speaker": "customer",
+    "text": "Yeah so — honestly our HubSpot setup has become a mess. We have sequences but our reps are spending like two hours a day doing manual follow-ups because the workflow automation just doesn't talk to our other tools. We use Salesloft, we use Gong, and none of it is connected. It's a multi-tool integration problem more than anything.",
+    "startMs": 32000,
+    "endMs": 62000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u5",
+    "speaker": "rep",
+    "text": "That's a classic problem when you're stitching together a stack. How long has this been the situation — is this new, or have you been living with it for a while?",
+    "startMs": 63000,
+    "endMs": 75000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u6",
+    "speaker": "customer",
+    "text": "About a year. We actually tried Marketo before this and that was even worse — it took us nine months just to roll it out properly, and by the time we had it working, half the team had already built workarounds. That's part of why I'm gun-shy about buying new tools — implementation risk is real.",
+    "startMs": 76000,
+    "endMs": 112000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u7",
+    "speaker": "rep",
+    "text": "That's completely fair — and honestly it's the number one thing we hear. The reason we can do two weeks is there's no implementation project, no SE engagement, no professional services. Ava connects to HubSpot in about forty minutes. If you're not live in two weeks, we refund the first month.",
+    "startMs": 113000,
+    "endMs": 138000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u8",
+    "speaker": "customer",
+    "text": "Two weeks is — okay that's actually really different from what I expected. I assumed we'd be looking at a quarter-long onboarding. No dedicated SE involvement at all?",
+    "startMs": 139000,
+    "endMs": 158000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u9",
+    "speaker": "rep",
+    "text": "None. Self-serve setup, we have a migration assistant that pulls your existing HubSpot sequences. And on the AI personalization side — Ava learns from your reply patterns over time, so the sequences get sharper as data comes in.",
+    "startMs": 159000,
+    "endMs": 178000,
+    "confidence": 0.98
+  },
+  {
+    "id": "u10",
+    "speaker": "customer",
+    "text": "Got it. The integration piece is what I keep coming back to honestly — like, does it actually push back to HubSpot automatically? Because right now reps are manually logging everything and it's a nightmare. We also have a lot of custom logic in Salesloft — Priya on my team built most of it and she's going to ask about that.",
+    "startMs": 179000,
+    "endMs": 215000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u11",
+    "speaker": "rep",
+    "text": "Full bidirectional sync — HubSpot, Salesforce, Gong if you want it. All writes happen automatically. And Ava runs alongside Salesloft rather than replacing it — your existing sequences stay intact. On budget — have you scoped this at all, or is that still TBD?",
+    "startMs": 216000,
+    "endMs": 235000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u12",
+    "speaker": "customer",
+    "text": "We have a rough range. My marketing tools budget for the year is around fifty to eighty thousand. If it works it probably comes out of there, but I'd need to loop in Marcus from RevOps before we sign anything — he holds the tooling keys above a certain threshold.",
+    "startMs": 236000,
+    "endMs": 264000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u13",
+    "speaker": "rep",
+    "text": "Good to know — that's definitely workable. Is there a timeline pressure, or is this more of a 'whenever we find the right thing' situation?",
+    "startMs": 265000,
+    "endMs": 280000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u14",
+    "speaker": "customer",
+    "text": "There's real pressure. We have a board update in July and I want to show pipeline numbers moving before then. So realistically we need to be onboarded and running by mid-June — that gives us four to six weeks of data before the update.",
+    "startMs": 281000,
+    "endMs": 310000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u15",
+    "speaker": "rep",
+    "text": "Mid-June is very doable with a two-week deploy. One question on process — is this your call, or are there other stakeholders we'd need to get comfortable?",
+    "startMs": 311000,
+    "endMs": 328000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u16",
+    "speaker": "customer",
+    "text": "I own the marketing budget so it's mostly my call up to a point, but I'd need to loop in Marcus from RevOps before we sign anything. He just came over from Gong so he knows this space. And Priya — my demand gen manager — she'd need to sign off on anything that touches our Salesloft setup.",
+    "startMs": 329000,
+    "endMs": 362000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u17",
+    "speaker": "rep",
+    "text": "That's helpful. Would it make sense to do a product demo with you, Marcus, and Priya — so Marcus can see the RevOps integration and Priya can see exactly how Salesloft coexists? We can get pretty technical on both fronts.",
+    "startMs": 363000,
+    "endMs": 385000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u18",
+    "speaker": "customer",
+    "text": "Yeah, let's do that. Getting all three of us in one room is actually the right call — I'd rather have Priya's objections on the table early than after we've committed. Can you do sometime next week? I'm thinking Tuesday or Wednesday afternoon.",
+    "startMs": 386000,
+    "endMs": 402000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u19",
+    "speaker": "rep",
+    "text": "Tuesday works. I'll send a calendar invite for the three of you with a short agenda — we'll focus on the HubSpot sync, the Salesloft coexistence layer, and RevOps data hygiene. Looking forward to it, Jordan.",
+    "startMs": 403000,
+    "endMs": 422000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u20",
+    "speaker": "customer",
+    "text": "Perfect. Thanks Alex, talk soon.",
+    "startMs": 423000,
+    "endMs": 430000,
+    "confidence": 0.99
+  }
+]

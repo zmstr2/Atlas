@@ -1,0 +1,42 @@
+{
+  "lead": {
+    "name": "Maya Chen",
+    "title": "VP Marketing",
+    "company": "MidCo",
+    "companySize": "50-200 employees"
+  },
+  "avaContext": {
+    "campaignId": "campaign-47",
+    "leadScore": 0.62,
+    "scoringSignals": [
+      { "signal": "VP Marketing title", "weight": 0.35 },
+      { "signal": "Uses HubSpot", "weight": 0.25 },
+      { "signal": "50-200 person company", "weight": 0.15 },
+      { "signal": "Recent Series B funding", "weight": 0.15 },
+      { "signal": "Posted about AI tools on LinkedIn", "weight": 0.10 }
+    ]
+  },
+  "pastInteractions": [
+    {
+      "type": "email",
+      "date": "2026-04-14",
+      "summary": "Cold outbound re: AI-powered outbound sequences. Maya opened twice but didn't reply."
+    },
+    {
+      "type": "email",
+      "date": "2026-04-22",
+      "summary": "Follow-up with workflow automation angle. Maya clicked the case study link."
+    }
+  ],
+  "callGoal": "qualify",
+  "suggestedQuestions": [
+    "What does your current outbound motion look like — are reps doing manual sequencing or is something automated?",
+    "You clicked through our workflow automation case study — what caught your eye there?",
+    "If you could wave a wand and fix one thing about how your team does outreach today, what would it be?"
+  ],
+  "productSnippets": [
+    "Ava deploys in 2 weeks with no implementation help required — no SE, no professional services.",
+    "Personalized AI sequences that learn from reply patterns — customers see 3x pipeline from the same list.",
+    "Native HubSpot sync: Ava writes back to the CRM automatically, so reps aren't doing data entry."
+  ]
+}

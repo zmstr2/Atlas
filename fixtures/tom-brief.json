@@ -1,0 +1,36 @@
+{
+  "lead": {
+    "name": "Tom Reyes",
+    "title": "Director of Sales Operations",
+    "company": "MidCo Corp",
+    "companySize": "100-250 employees"
+  },
+  "avaContext": {
+    "campaignId": "campaign-47",
+    "leadScore": 0.55,
+    "scoringSignals": [
+      { "signal": "Sales Operations title", "weight": 0.25 },
+      { "signal": "150-person company", "weight": 0.20 },
+      { "signal": "Uses Salesforce", "weight": 0.30 },
+      { "signal": "Recent LinkedIn post about SDR efficiency", "weight": 0.25 }
+    ]
+  },
+  "pastInteractions": [
+    {
+      "type": "email",
+      "date": "2026-04-20",
+      "summary": "Cold outbound re: SDR productivity. Tom opened and clicked."
+    }
+  ],
+  "callGoal": "qualify",
+  "suggestedQuestions": [
+    "What's the current state of your SDR team — how many reps, what tooling are they on?",
+    "Your LinkedIn post mentioned SDR efficiency — what specifically is breaking down?",
+    "Who typically owns a decision like this at your company — is it you or does VP Sales get involved?"
+  ],
+  "productSnippets": [
+    "Ava handles the full outbound sequence so SDRs focus on warm conversations only.",
+    "Native Salesforce integration — Ava writes activity data back automatically, no manual logging.",
+    "For a 150-person org, typical ROI is 2.5x pipeline within 90 days."
+  ]
+}

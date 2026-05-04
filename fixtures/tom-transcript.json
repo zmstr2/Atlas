@@ -1,0 +1,98 @@
+[
+  {
+    "id": "u1",
+    "speaker": "rep",
+    "text": "Hey Tom, good to connect. I'm Alex from Artisan. I saw your post about SDR efficiency last week — seemed like the right time to reach out.",
+    "startMs": 0,
+    "endMs": 10000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u2",
+    "speaker": "customer",
+    "text": "Yeah, hey Alex. Tom Reyes, Director of Sales Ops. It's a constant battle honestly — we've got eight SDRs and they're spending way too much time on admin. What are you guys doing exactly?",
+    "startMs": 11000,
+    "endMs": 30000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u3",
+    "speaker": "rep",
+    "text": "So Ava is an AI BDR that handles the full outbound sequence — prospecting, personalized email generation, follow-ups — so your SDRs are only jumping in when there's a warm signal. What does the admin breakdown look like for your team right now?",
+    "startMs": 31000,
+    "endMs": 54000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u4",
+    "speaker": "customer",
+    "text": "It's mostly Salesforce data entry. Our reps are logging calls, updating fields, writing activity notes manually. I estimate maybe forty percent of their day is admin, which is brutal. We have Salesforce but we're not getting the value out of it because the data hygiene is terrible.",
+    "startMs": 55000,
+    "endMs": 92000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u5",
+    "speaker": "rep",
+    "text": "That's a really common pattern with Salesforce-heavy stacks. Ava writes all activity data back automatically — call logs, email engagement, stage updates — so your CRM data is clean without reps touching it. Does that solve the core problem?",
+    "startMs": 93000,
+    "endMs": 117000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u6",
+    "speaker": "customer",
+    "text": "That would be huge, honestly. The automatic Salesforce sync is exactly what we need. I'm interested. What does pricing look like?",
+    "startMs": 118000,
+    "endMs": 135000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u7",
+    "speaker": "rep",
+    "text": "For a team your size — eight SDRs — you're typically in the thirty to fifty thousand per year range depending on seat count and features. Does that fit within what you're working with?",
+    "startMs": 136000,
+    "endMs": 155000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u8",
+    "speaker": "customer",
+    "text": "I mean... I think we could probably get to thirty, thirty-five thousand. I'd have to run it past Sarah Kim, she's our VP Sales. Anything over twenty-five thousand she needs to sign off on, and honestly I don't think I could get this through without her on the call. She's the one with P&L accountability.",
+    "startMs": 156000,
+    "endMs": 198000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u9",
+    "speaker": "rep",
+    "text": "That's totally fine — and it's actually better to have Sarah involved early so we're not doing a demo twice. Would she be open to a follow-up call? I can bring our head of CS to walk through the Salesforce integration in detail.",
+    "startMs": 199000,
+    "endMs": 222000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u10",
+    "speaker": "customer",
+    "text": "I think so. She's been talking about fixing the Salesforce problem for a while too, so it's not a cold pitch. I'd probably send her a summary of what we talked about first and then loop you in. But I can't promise her timeline — she's pretty stretched right now.",
+    "startMs": 223000,
+    "endMs": 262000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u11",
+    "speaker": "rep",
+    "text": "That works. Why don't I send you a one-pager you can forward to Sarah — covers the Salesforce sync, pricing range, and a quick ROI estimate for eight SDRs. Does that make it easier?",
+    "startMs": 263000,
+    "endMs": 283000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u12",
+    "speaker": "customer",
+    "text": "Yeah that would actually be perfect. Send it to my work email. I'll read through it and pass it along. Just don't cold-email Sarah directly — she doesn't appreciate that.",
+    "startMs": 284000,
+    "endMs": 305000,
+    "confidence": 0.97
+  }
+]

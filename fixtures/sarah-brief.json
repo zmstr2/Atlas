@@ -1,0 +1,36 @@
+{
+  "lead": {
+    "name": "Sarah Park",
+    "title": "Head of Growth",
+    "company": "EarlyCo",
+    "companySize": "15-50 employees"
+  },
+  "avaContext": {
+    "campaignId": "campaign-47",
+    "leadScore": 0.58,
+    "scoringSignals": [
+      { "signal": "Head of Growth title", "weight": 0.30 },
+      { "signal": "Recent Series A ($8M)", "weight": 0.35 },
+      { "signal": "B2B SaaS company", "weight": 0.20 },
+      { "signal": "Follows AI thought leaders on LinkedIn", "weight": 0.15 }
+    ]
+  },
+  "pastInteractions": [
+    {
+      "type": "email",
+      "date": "2026-04-18",
+      "summary": "Cold outbound re: AI-powered sequences. Sarah opened once."
+    }
+  ],
+  "callGoal": "qualify",
+  "suggestedQuestions": [
+    "What's driving outbound for you right now — are reps running sequences manually or do you have tooling in place?",
+    "Now that you've closed your Series A, is there budget allocated for sales infrastructure?",
+    "What does your outbound team look like — how many reps are focused on this?"
+  ],
+  "productSnippets": [
+    "Ava scales outbound 3x without adding headcount — one AE's pipeline looks like three.",
+    "AI personalization sequences trained on your best-performing emails from day one.",
+    "For early-stage teams, we have a startup plan — lower seat cost, scales as you hire."
+  ]
+}

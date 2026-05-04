@@ -1,0 +1,114 @@
+[
+  {
+    "id": "u1",
+    "speaker": "rep",
+    "text": "Hey Sarah, thanks for jumping on. I'm Alex from Artisan. How's your Tuesday going?",
+    "startMs": 0,
+    "endMs": 7000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u2",
+    "speaker": "customer",
+    "text": "Pretty busy, but good. Yeah so I'm Sarah, Head of Growth at EarlyCo. We're about twenty five people, closed our Series A a few months ago, still figuring out the go-to-market honestly.",
+    "startMs": 8000,
+    "endMs": 26000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u3",
+    "speaker": "rep",
+    "text": "Congrats on the Series A. What's the outbound motion looking like right now — are reps running sequences manually, or do you have tooling?",
+    "startMs": 27000,
+    "endMs": 40000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u4",
+    "speaker": "customer",
+    "text": "Mostly manual right now. We have one SDR and she's doing everything by hand in Apollo. It works but it's not scalable. We know we need to figure this out eventually.",
+    "startMs": 41000,
+    "endMs": 63000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u5",
+    "speaker": "rep",
+    "text": "Understood. So when you say eventually — is there budget set aside for sales infrastructure after the Series A, or is it more of a when-we-get-there thing?",
+    "startMs": 64000,
+    "endMs": 80000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u6",
+    "speaker": "customer",
+    "text": "Honestly, we don't really have a dedicated budget for tooling right now. Like, the Series A went to hiring — we're growing the eng team mostly. Sales tools are kind of on the backburner until we've figured out product-market fit a bit more.",
+    "startMs": 81000,
+    "endMs": 114000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u7",
+    "speaker": "rep",
+    "text": "That makes sense. Is there a point in the next few quarters where that changes — like, is there a milestone where you'd say okay, now we invest in outbound infrastructure?",
+    "startMs": 115000,
+    "endMs": 133000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u8",
+    "speaker": "customer",
+    "text": "Maybe next year? We're really focused on closing our first twenty customers manually right now, learning from each one. Automating before we know what works feels premature. I'd guess we revisit this in Q4 at the earliest, probably early next year.",
+    "startMs": 134000,
+    "endMs": 172000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u9",
+    "speaker": "rep",
+    "text": "That's a really smart way to think about it. Quick question — have you looked at AI-powered sequences at all? The personalization angle can be powerful even at your stage.",
+    "startMs": 173000,
+    "endMs": 190000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u10",
+    "speaker": "customer",
+    "text": "Yeah I've seen the AI sequences thing a lot lately. We're not really at the scale where personalization is the bottleneck — we just need more volume honestly, and right now I'm not sure adding a tool helps with that before we understand our ICP better.",
+    "startMs": 191000,
+    "endMs": 226000,
+    "confidence": 0.96
+  },
+  {
+    "id": "u11",
+    "speaker": "rep",
+    "text": "That's completely fair. One thing I'll leave you with — for teams at your stage, Ava can actually help clarify ICP by showing you which signals convert, so it's not just about volume. But I hear you on the timing.",
+    "startMs": 227000,
+    "endMs": 248000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u12",
+    "speaker": "customer",
+    "text": "That's interesting in theory but I think we need to be doing it ourselves first to understand it. Outsourcing the learning too early feels risky.",
+    "startMs": 249000,
+    "endMs": 268000,
+    "confidence": 0.97
+  },
+  {
+    "id": "u13",
+    "speaker": "rep",
+    "text": "Totally get it. Sounds like Q4 or early next year is the right time to reconnect. Should I put a note to reach back out then, or would you prefer to reach out when the timing is right?",
+    "startMs": 269000,
+    "endMs": 287000,
+    "confidence": 0.99
+  },
+  {
+    "id": "u14",
+    "speaker": "customer",
+    "text": "Yeah, Q4 reconnect sounds good. Drop me an email in October and we'll see where things are. I don't want to commit to anything before then.",
+    "startMs": 288000,
+    "endMs": 308000,
+    "confidence": 0.97
+  }
+]
