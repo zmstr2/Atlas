@@ -7,8 +7,15 @@ import { coachWebSocketHandler, type CoachWebSocketData } from './coach/ws';
 
 const app = new Hono();
 
+const allowedOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
 app.use('*', cors({
-  origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+  origin: (origin) => {
+    if (!origin) return allowedOrigin;
+    if (origin === allowedOrigin) return origin;
+    if (origin.endsWith('.vercel.app')) return origin;
+    if (origin === 'http://localhost:3000' || origin === 'http://localhost:3001') return origin;
+    return null;
+  },
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Call-Id'],
 }));
