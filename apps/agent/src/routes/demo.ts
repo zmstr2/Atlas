@@ -12,7 +12,7 @@ import { broadcastEvent } from '../sse/handler';
 const SCRIPTS = ['jordan', 'sarah', 'tom'] as const;
 type Script = typeof SCRIPTS[number];
 
-const IP_DAILY_CAP = 5;
+const IP_DAILY_CAP = 20;
 const GLOBAL_DAILY_SPEND_USD = 20;
 
 // Resolve fixtures dir relative to this file's location: apps/agent/src/routes/ → ../../../fixtures
