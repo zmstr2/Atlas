@@ -1,33 +1,64 @@
-import type { Config } from "tailwindcss";
+import type { Config } from 'tailwindcss';
 
-export default {
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
+const config: Config = {
+  content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        // Consistent color palette
-        primary: "hsl(221, 83%, 53%)", // blue-600
-        secondary: "hsl(210, 40%, 96%)", // gray-50
-        accent: "hsl(221, 83%, 53%)", // blue-600
-        destructive: "hsl(0, 84%, 60%)", // red-500
+        bg: {
+          base: '#F7F4ED',
+          elevated: '#FFFFFF',
+          subtle: '#F1EBDF',
+          muted: '#E8DFCC',
+        },
+        fg: {
+          primary: '#1C1917',
+          secondary: '#57534E',
+          muted: '#A8A29E',
+        },
+        accent: {
+          DEFAULT: '#5B3FBE',
+          hover: '#4A32A0',
+          soft: '#EFEAFA',
+          glow: '#E8E0FA',
+        },
+        qual: {
+          budget: '#047857',
+          authority: '#1D4ED8',
+          need: '#B45309',
+          timeline: '#6D28D9',
+        },
+        signal: {
+          positive: '#047857',
+          negative: '#B91C1C',
+        },
+        border: {
+          DEFAULT: '#E5DDCC',
+          strong: '#D6CCB6',
+        },
       },
-      fontSize: {
-        'display': ['32px', { lineHeight: '1.2', fontWeight: '700' }],
-        'h1': ['24px', { lineHeight: '1.3', fontWeight: '600' }],
-        'h2': ['18px', { lineHeight: '1.4', fontWeight: '500' }],
-        'body': ['16px', { lineHeight: '1.6', fontWeight: '400' }],
-        'small': ['14px', { lineHeight: '1.5', fontWeight: '400' }],
-        'caption': ['12px', { lineHeight: '1.4', fontWeight: '400' }],
+      fontFamily: {
+        sans: ['var(--font-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+      },
+      keyframes: {
+        'slide-in': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        pulse: {
+          '0%, 100%': { opacity: '0.6' },
+          '50%': { opacity: '1' },
+        },
+      },
+      animation: {
+        'slide-in': 'slide-in 240ms ease-out forwards',
+        'atlas-pulse': 'pulse 1.6s ease-in-out infinite',
       },
     },
   },
-  plugins: [
-    require('@tailwindcss/typography'),
-  ],
-} satisfies Config;
+  plugins: [],
+};
+
+export default config;

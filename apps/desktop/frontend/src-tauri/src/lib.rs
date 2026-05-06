@@ -37,6 +37,7 @@ pub(crate) use perf_trace;
 // Declare audio module
 pub mod analytics;
 pub mod api;
+pub mod atlas_bridge;
 pub mod audio;
 pub mod config;
 pub mod console_utils;
@@ -396,6 +397,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_shell::init())
+        .manage(atlas_bridge::AtlasState::new())
         .manage(whisper_engine::parallel_commands::ParallelProcessorState::new())
         .manage(Arc::new(RwLock::new(
             None::<notifications::manager::NotificationManager<tauri::Wry>>,
@@ -404,6 +407,20 @@ pub fn run() {
         .manage(summary::summary_engine::ModelManagerState(Arc::new(tokio::sync::Mutex::new(None))))
         .setup(|_app| {
             log::info!("Application setup complete");
+
+            // Atlas: spawn the bundled atlas-agent sidecar and start
+            // forwarding finalized transcripts to it.
+            match atlas_bridge::spawn_sidecar(&_app.handle()) {
+                Ok(child) => {
+                    if let Some(state) = _app.try_state::<atlas_bridge::AtlasState>() {
+                        if let Ok(mut guard) = state.sidecar_handle.lock() {
+                            *guard = Some(child);
+                        }
+                    }
+                }
+                Err(e) => log::error!("Failed to spawn atlas-agent sidecar: {}", e),
+            }
+            atlas_bridge::install_event_forwarder(&_app.handle());
 
             // Initialize system tray
             if let Err(e) = tray::create_tray(_app.handle()) {
@@ -503,6 +520,9 @@ pub fn run() {
             get_transcription_status,
             read_audio_file,
             save_transcript,
+            atlas_bridge::set_active_atlas_call,
+            atlas_bridge::clear_active_atlas_call,
+            atlas_bridge::atlas_sidecar_base_url,
             analytics::commands::init_analytics,
             analytics::commands::disable_analytics,
             analytics::commands::track_event,

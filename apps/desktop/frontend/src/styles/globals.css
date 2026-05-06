@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Surfaces — warm paper, less yellow than before */
+  --bg-base: #F7F4ED;
+  --bg-elevated: #FFFFFF;
+  --bg-subtle: #F1EBDF;
+  --bg-muted: #E8DFCC;
+
+  /* Foreground — warm near-black instead of pure black */
+  --fg-primary: #1C1917;
+  --fg-secondary: #57534E;
+  --fg-muted: #A8A29E;
+
+  /* Accent — Artisan purple (unchanged) + softer support tones */
+  --accent: #5B3FBE;
+  --accent-hover: #4A32A0;
+  --accent-soft: #EFEAFA;
+  --accent-glow: #E8E0FA;
+
+  /* Qualification — desaturated to play nice with warm neutrals */
+  --qual-budget: #047857;
+  --qual-authority: #1D4ED8;
+  --qual-need: #B45309;
+  --qual-timeline: #6D28D9;
+
+  /* Signals */
+  --signal-positive: #047857;
+  --signal-negative: #B91C1C;
+
+  /* Border — subtle warm tone */
+  --border: #E5DDCC;
+  --border-strong: #D6CCB6;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--fg-primary);
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+@layer base {
+  h1, h2 {
+    text-wrap: balance;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
