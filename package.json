@@ -1,12 +1,14 @@
 {
   "name": "atlas",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": ["apps/*", "apps/desktop/frontend", "packages/*"],
   "scripts": {
     "dev": "bun run --filter='*' dev",
     "dev:agent": "bun run --filter='@atlas/agent' dev",
     "dev:web": "bun run --filter='@atlas/web' dev",
+    "dev:desktop": "bun run --filter='@atlas/desktop' tauri:dev",
     "build": "bun run --filter='*' build",
+    "build:sidecar": "bash apps/desktop/scripts/build-sidecar.sh",
     "test": "bun run --filter='*' test",
     "typecheck": "bun run --filter='*' typecheck",
     "smoke": "bun run scripts/smoke.ts",
