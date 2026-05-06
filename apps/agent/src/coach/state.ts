@@ -59,7 +59,7 @@ export function createCoachState(opts: { callId: string; personaId: PersonaId })
     transcriptDumped: false,
   };
   states.set(opts.callId, state);
-  createCall(opts.callId, opts.personaId);
+  createCall(opts.callId, { script: opts.personaId, brief: state.brief });
   return state;
 }
 

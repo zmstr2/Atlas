@@ -68,7 +68,7 @@ demoRoutes.post('/start', async (c) => {
   }
 
   const callId = nanoid();
-  createCall(callId, body.script);
+  createCall(callId, { script: body.script, brief });
 
   const session = createPipelineSession(callId, brief);
   registerSession(session);
