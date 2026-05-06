@@ -1,4 +1,4 @@
-import type { Utterance, PreCallBrief, MemoryPatch, Suggestion } from '@atlas/types';
+import type { Utterance, PreCallBrief, MemoryPatch, Suggestion, SpeakerRole } from '@atlas/types';
 import { MemoryStore } from '../memory/store';
 import { HotTail } from '../memory/hotTail';
 import { buildCallFactsUI } from '../memory/factsUI';
@@ -88,7 +88,7 @@ function shouldBroadcastSuggestion(session: PipelineSession, s: Suggestion): boo
   return true;
 }
 
-function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, speaker: 'rep' | 'customer') {
+function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, speaker: SpeakerRole) {
   session.recentSuggestions.push({
     turn: session.turnCounter,
     speaker,
@@ -129,9 +129,9 @@ export async function processUtterance(session: PipelineSession, utterance: Utte
         brief,
         recentSuggestions: [...session.recentSuggestions],
       })
-    : utterance.speaker === 'customer'
-      ? runProspectSuggester({ utterance, hotTail: tail, prevMemory, brief })
-      : runRepWatcher({ utterance, hotTail: tail, prevMemory, brief });
+    : utterance.speaker === 'founder'
+      ? runRepWatcher({ utterance, hotTail: tail, prevMemory, brief })
+      : runProspectSuggester({ utterance, hotTail: tail, prevMemory, brief });
 
   // Memory agent (NON-BLOCKING, runs in parallel)
   const memoryPromise = runMemoryAgent({
@@ -183,7 +183,7 @@ export async function processUtterance(session: PipelineSession, utterance: Utte
           utteranceId: utterance.id,
           turnId,
         });
-        if (utterance.speaker === 'customer') {
+        if (utterance.speaker !== 'founder') {
           const ui = buildCallFactsUI(store.snapshot);
           broadcastEvent(callId, { type: 'facts_ui_delta', ui });
         }

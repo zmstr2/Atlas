@@ -33,7 +33,7 @@ const BRIEF: PreCallBrief = {
 // u1: rep intro (already spoken — lives in hotTail as prior context)
 const U1_REP: HotTailEntry = {
   id: 'u1',
-  speaker: 'rep',
+  speaker: 'founder',
   text: "Hi Maya, thanks for taking the time today. I'm Alex from Artisan. Quick housekeeping — I may take a few notes as we go, hope that's alright.",
   ts: 0,
 };

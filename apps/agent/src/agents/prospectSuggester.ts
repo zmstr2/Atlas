@@ -1,11 +1,12 @@
 import { SuggestionSchema } from '@atlas/types';
 import type { Suggestion, Utterance, MeetingMemory, PreCallBrief } from '@atlas/types';
+import { getProspect } from '@atlas/types';
 import { llmGenerateObject } from '../llm/wrapper';
 import { renderMemoryMarkdown } from '../memory/render';
 import { detectAnchorContradictions } from '../memory/anchors';
 import type { HotTailEntry } from '../memory/hotTail';
 
-const SYSTEM = `You are Atlas's discovery co-pilot, watching a live sales call. You see the prospect's latest utterance and decide whether to fire ONE suggestion to the rep. Most prospect turns produce no suggestion — silence is the default.
+const SYSTEM = `You are Atlas's discovery co-pilot, watching a live sales call. You see the prospect's latest utterance and decide whether to fire ONE suggestion to the founder. Most prospect turns produce no suggestion — silence is the default.
 
 # Where the call is
 
@@ -18,7 +19,7 @@ premature.
 
 Before suggesting anything, look at what's already in CALL CONTEXT — the
 BANT / MEDDIC axes, the verbatim anchors, the flow — and ask: what has the
-rep actually learned so far, and what's the most useful thing to learn
+founder actually learned so far, and what's the most useful thing to learn
 next? Let that shape your suggestion. A stakeholder name or a date the
 prospect drops in passing is worth noting, but it's rarely the right thing
 to chase if pain isn't yet real.
@@ -26,19 +27,19 @@ to chase if pain isn't yet real.
 # Principles — fire only when the prospect's last turn opened one of these moments
 
 1. Depth over breadth
-   Prospect described a problem in vague or qualitative terms. Rep should drill for the number, the workflow, or the owner before moving on.
+   Prospect described a problem in vague or qualitative terms. Founder should drill for the number, the workflow, or the owner before moving on.
 
 2. Capture every specific
-   Prospect dropped a concrete detail — budget figure, headcount, decision date, named stakeholder, current vendor, deadline. Rep should anchor on it: probe the stakeholder, multi-thread, lock the number.
+   Prospect dropped a concrete detail — budget figure, headcount, decision date, named stakeholder, current vendor, deadline. Founder should anchor on it: probe the stakeholder, multi-thread, lock the number.
 
 3. Reframe the objection
-   Prospect raised a concern. Rep should LAER (listen, acknowledge, explore, respond) — not defend or pitch against it.
+   Prospect raised a concern. Founder should LAER (listen, acknowledge, explore, respond) — not defend or pitch against it.
 
 4. Make the status quo expensive
-   Pain has been established but the cost of doing nothing isn't on the table. Rep should ask what happens if it goes unsolved this quarter.
+   Pain has been established but the cost of doing nothing isn't on the table. Founder should ask what happens if it goes unsolved this quarter.
 
 5. Advance the deal
-   Past the meaningful midpoint, or a champion has been identified — rep should propose a specific next step, equip the champion, or qualify out cleanly if DQ criteria stack up.
+   Past the meaningful midpoint, or a champion has been identified — founder should propose a specific next step, equip the champion, or qualify out cleanly if DQ criteria stack up.
 
 # Anchor contradiction override
 If CONTRADICTIONS DETECTED is non-empty in the user prompt, fire play='correct_contradiction' at priority='critical' regardless of the principles above.
@@ -47,7 +48,7 @@ If CONTRADICTIONS DETECTED is non-empty in the user prompt, fire play='correct_c
 In the \`reasoning\` field, name all three:
 (a) which principle this moment matches
 (b) the specific evidence — utteranceId, anchor turnId, or brief field — that makes the principle apply right now
-(c) what the rep should do in their next turn
+(c) what the founder should do in their next turn
 
 If you cannot name all three concretely, shouldFire=false. Greetings, transitions, on-axis questions, and clear answers that don't open new ground match no principle — stay silent.
 
@@ -69,19 +70,20 @@ export async function runProspectSuggester(opts: {
 }): Promise<Suggestion> {
   const { utterance, hotTail, prevMemory, brief } = opts;
 
+  const prospect = getProspect(brief);
   const memoryMarkdown = renderMemoryMarkdown({
     memory: prevMemory,
     hotTail,
-    leadName: brief.lead.name,
+    leadName: prospect.name,
     callGoal: brief.callGoal,
   });
 
-  const productSnippets = brief.productSnippets.slice(0, 6).join(' | ');
+  const productSnippets = (brief.productSnippets ?? []).slice(0, 6).join(' | ');
 
-  // Last rep utterance for short-answer interpretation
-  const priorRep = [...hotTail].reverse().find((h) => h.speaker === 'rep');
+  // Last founder utterance for short-answer interpretation
+  const priorFounder = [...hotTail].reverse().find((h) => h.speaker === 'founder');
 
-  // Note: contradictions are typically rep-side. We still surface any active ones
+  // Note: contradictions are typically founder-side. We still surface any active ones
   // so the suggester is aware (even if the rep-watcher will be the primary firer).
   const contradictions = detectAnchorContradictions(prevMemory, utterance.text);
   const contradictionLines = contradictions.map(
@@ -92,12 +94,12 @@ export async function runProspectSuggester(opts: {
 ${memoryMarkdown}
 
 # PRE-CALL BRIEF
-Lead: ${brief.lead.name}, ${brief.lead.title} @ ${brief.lead.company}
-Call goal: ${brief.callGoal}
-Product snippets (for surface_value_prop play): ${productSnippets}
+Lead: ${prospect.name}${prospect.title ? `, ${prospect.title}` : ''}${prospect.company ? ` @ ${prospect.company}` : ''}
+Call goal: ${brief.callGoal ?? '(none specified)'}
+Product snippets (for surface_value_prop play): ${productSnippets || '(none)'}
 
-# IMMEDIATE PRIOR REP UTTERANCE (for short-answer interpretation)
-${priorRep ? `[${priorRep.id}] REP: ${priorRep.text}` : '(none)'}
+# IMMEDIATE PRIOR FOUNDER UTTERANCE (for short-answer interpretation)
+${priorFounder ? `[${priorFounder.id}] FOUNDER: ${priorFounder.text}` : '(none)'}
 
 # NEW PROSPECT UTTERANCE
 [${utterance.id}] PROSPECT: ${utterance.text}

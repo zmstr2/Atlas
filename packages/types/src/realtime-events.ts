@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const PersonaIdSchema = z.enum(['jordan']);
 export type PersonaId = z.infer<typeof PersonaIdSchema>;
 
-export const TranscriptSpeakerSchema = z.enum(['rep', 'persona']);
+export const TranscriptSpeakerSchema = z.enum(['founder', 'persona']);
 export type TranscriptSpeaker = z.infer<typeof TranscriptSpeakerSchema>;
 
 export const TranscriptEventSchema = z.object({

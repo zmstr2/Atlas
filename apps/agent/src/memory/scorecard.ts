@@ -8,7 +8,7 @@ import type {
 } from '@atlas/types';
 
 type StatsInput = {
-  repWords: number;
+  founderWords: number;
   prospectWords: number;
   turnsSinceLastRepQuestion: number;
   turnsSinceLastNextStepProposal: number;
@@ -224,7 +224,7 @@ export function computeScorecard(memory: MeetingMemory, stats: StatsInput): Qual
     pushQueue,
     hardDisqualify,
     softDisqualifySignals,
-    talkRatio: { repWords: stats.repWords, prospectWords: stats.prospectWords },
+    talkRatio: { founderWords: stats.founderWords, prospectWords: stats.prospectWords },
     turnsSinceLastRepQuestion: stats.turnsSinceLastRepQuestion,
     turnsSinceLastNextStepProposal: stats.turnsSinceLastNextStepProposal,
     callMinute: stats.callMinute,

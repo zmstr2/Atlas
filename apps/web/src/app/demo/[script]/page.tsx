@@ -146,7 +146,7 @@ export default function DemoPage({ params }: { params: { script: string } }) {
       <div className="flex flex-1 overflow-hidden">
         <TranscriptView
           utterances={utterances}
-          customerName={brief?.lead.name ?? label}
+          customerName={(brief?.lead?.name ?? brief?.prospect?.name) ?? label}
         />
         <MemoryPanel memory={memory} factsUI={factsUI} />
       </div>

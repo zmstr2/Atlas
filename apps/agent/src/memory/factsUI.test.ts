@@ -4,7 +4,7 @@ import { computeScorecard } from './scorecard';
 import { createEmptyMemory } from './store';
 
 const baseStats = {
-  repWords: 100,
+  founderWords: 100,
   prospectWords: 100,
   turnsSinceLastRepQuestion: 0,
   turnsSinceLastNextStepProposal: 0,
@@ -70,8 +70,8 @@ describe('buildCallFactsUI', () => {
 
   test('open loops surfaced; closed loops filtered', () => {
     const memory = createEmptyMemory();
-    memory.openLoops.push({ id: 'l1', description: 'circle back to Marcus', owner: 'rep', status: 'open' });
-    memory.openLoops.push({ id: 'l2', description: 'send pricing', owner: 'rep', status: 'addressed' });
+    memory.openLoops.push({ id: 'l1', description: 'circle back to Marcus', owner: 'founder', status: 'open' });
+    memory.openLoops.push({ id: 'l2', description: 'send pricing', owner: 'founder', status: 'addressed' });
     memory.scorecard = computeScorecard(memory, baseStats);
     const ui = buildCallFactsUI(memory);
     expect(ui.openLoops.length).toBe(1);
@@ -80,9 +80,9 @@ describe('buildCallFactsUI', () => {
 
   test('talk ratio normalized', () => {
     const memory = createEmptyMemory();
-    memory.scorecard = computeScorecard(memory, { ...baseStats, repWords: 300, prospectWords: 100 });
+    memory.scorecard = computeScorecard(memory, { ...baseStats, founderWords: 300, prospectWords: 100 });
     const ui = buildCallFactsUI(memory);
-    expect(ui.stage.talkRatio.rep).toBeCloseTo(0.75);
+    expect(ui.stage.talkRatio.founder).toBeCloseTo(0.75);
     expect(ui.stage.talkRatio.prospect).toBeCloseTo(0.25);
   });
 });

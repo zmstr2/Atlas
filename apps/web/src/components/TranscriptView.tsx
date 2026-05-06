@@ -39,7 +39,7 @@ export function TranscriptView({
         <p className="text-fg-muted text-sm text-center mt-8">Transcript will appear here…</p>
       )}
       {utterances.map((u) => {
-        const isRep = u.speaker === 'rep';
+        const isRep = u.speaker === 'founder';
         return (
           <div
             key={u.id}

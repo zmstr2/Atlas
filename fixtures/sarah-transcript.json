@@ -1,7 +1,7 @@
 [
   {
     "id": "u1",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Hey Sarah, thanks for jumping on. I'm Alex from Artisan. How's your Tuesday going?",
     "startMs": 0,
     "endMs": 7000,
@@ -17,7 +17,7 @@
   },
   {
     "id": "u3",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Congrats on the Series A. What's the outbound motion looking like right now — are reps running sequences manually, or do you have tooling?",
     "startMs": 27000,
     "endMs": 40000,
@@ -33,7 +33,7 @@
   },
   {
     "id": "u5",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Understood. So when you say eventually — is there budget set aside for sales infrastructure after the Series A, or is it more of a when-we-get-there thing?",
     "startMs": 64000,
     "endMs": 80000,
@@ -49,7 +49,7 @@
   },
   {
     "id": "u7",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That makes sense. Is there a point in the next few quarters where that changes — like, is there a milestone where you'd say okay, now we invest in outbound infrastructure?",
     "startMs": 115000,
     "endMs": 133000,
@@ -65,7 +65,7 @@
   },
   {
     "id": "u9",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That's a really smart way to think about it. Quick question — have you looked at AI-powered sequences at all? The personalization angle can be powerful even at your stage.",
     "startMs": 173000,
     "endMs": 190000,
@@ -81,7 +81,7 @@
   },
   {
     "id": "u11",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That's completely fair. One thing I'll leave you with — for teams at your stage, Ava can actually help clarify ICP by showing you which signals convert, so it's not just about volume. But I hear you on the timing.",
     "startMs": 227000,
     "endMs": 248000,
@@ -97,7 +97,7 @@
   },
   {
     "id": "u13",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Totally get it. Sounds like Q4 or early next year is the right time to reconnect. Should I put a note to reach back out then, or would you prefer to reach out when the timing is right?",
     "startMs": 269000,
     "endMs": 287000,

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FlowTagSchema, AnchorAxisSchema, AxisKeySchema, AxisStateSchema, BantRenderEntrySchema } from './memory';
+import { SpeakerRoleSchema } from './utterance';
 
 // ---------- Suggestion output for prospect-suggester + rep-watcher ----------
 
@@ -67,7 +68,7 @@ const ConcernPatchSchema = z.object({
 const OpenLoopPatchSchema = z.object({
   op: z.enum(['append', 'close']),
   description: z.string(),
-  owner: z.enum(['rep', 'customer']),
+  owner: z.enum(['founder', 'customer']),
   closeDescription: z.string().nullable(),
 });
 
@@ -125,7 +126,7 @@ export type Evidence = z.infer<typeof EvidenceSchema>;
 export const MemoryPatchSchema = z.object({
   utteranceId: z.string(),
   turnId: z.string(),
-  speaker: z.enum(['rep', 'customer']),
+  speaker: SpeakerRoleSchema,
   // Required by OpenAI strict structured outputs (every property in `required`).
   // `.nullable()` (not `.optional()`) so the LLM emits `null` to mean "nothing
   // on this axis"; consumers treat null and undefined identically via falsy.

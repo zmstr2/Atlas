@@ -24,11 +24,11 @@ export function renderMemoryMarkdown(opts: {
   }
 
   // Stage
-  const totalWords = sc.talkRatio.repWords + sc.talkRatio.prospectWords;
-  const repPct = totalWords > 0 ? Math.round((sc.talkRatio.repWords / totalWords) * 100) : 0;
+  const totalWords = sc.talkRatio.founderWords + sc.talkRatio.prospectWords;
+  const founderPct = totalWords > 0 ? Math.round((sc.talkRatio.founderWords / totalWords) * 100) : 0;
   const prospectPct = totalWords > 0 ? Math.round((sc.talkRatio.prospectWords / totalWords) * 100) : 0;
   lines.push('## Stage');
-  lines.push(`Minute ${sc.callMinute}. Talk ratio (words): rep ${repPct}% / prospect ${prospectPct}%. Turns since last R-Q: ${sc.turnsSinceLastRepQuestion}. Turns since last R-NS: ${sc.turnsSinceLastNextStepProposal}.`);
+  lines.push(`Minute ${sc.callMinute}. Talk ratio (words): founder ${founderPct}% / prospect ${prospectPct}%. Turns since last R-Q: ${sc.turnsSinceLastRepQuestion}. Turns since last R-NS: ${sc.turnsSinceLastNextStepProposal}.`);
   lines.push('');
 
   // BANT / MEDDIC

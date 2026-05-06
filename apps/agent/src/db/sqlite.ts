@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import type { MeetingMemory, Utterance, Suggestion } from '@atlas/types';
+import type { MeetingMemory, Utterance, Suggestion, SpeakerRole } from '@atlas/types';
 
 const db = new Database(process.env.SQLITE_PATH ?? 'atlas.db', { create: true });
 
@@ -139,7 +139,7 @@ export function recordSuggestion(
 export type LoadedUtteranceRow = {
   id: string;
   call_id: string;
-  speaker: 'rep' | 'customer';
+  speaker: SpeakerRole;
   text: string;
   start_ms: number;
   end_ms: number;

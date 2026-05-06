@@ -1,8 +1,8 @@
 import { describe, test, expect } from 'bun:test';
 import { HotTail } from './hotTail';
-import type { Utterance } from '@atlas/types';
+import type { Utterance, SpeakerRole } from '@atlas/types';
 
-function u(id: string, speaker: 'rep' | 'customer', text: string): Utterance {
+function u(id: string, speaker: SpeakerRole, text: string): Utterance {
   return { id, speaker, text, startMs: 0, endMs: 0, confidence: 1, derivedFromLowConfidence: false };
 }
 
@@ -10,7 +10,7 @@ describe('HotTail', () => {
   test('FIFO with K=5 cap', () => {
     const tail = new HotTail(5);
     for (let i = 0; i < 6; i++) {
-      tail.push(u(`u${i}`, i % 2 === 0 ? 'rep' : 'customer', `text ${i}`));
+      tail.push(u(`u${i}`, i % 2 === 0 ? 'founder' : 'customer', `text ${i}`));
     }
     const snap = tail.snapshot();
     expect(snap.length).toBe(5);
@@ -20,24 +20,24 @@ describe('HotTail', () => {
 
   test('preserves speaker tags', () => {
     const tail = new HotTail();
-    tail.push(u('a', 'rep', 'hi'));
+    tail.push(u('a', 'founder', 'hi'));
     tail.push(u('b', 'customer', 'yes'));
-    tail.push(u('c', 'rep', 'why'));
+    tail.push(u('c', 'founder', 'why'));
     const snap = tail.snapshot();
-    expect(snap.map((h) => h.speaker)).toEqual(['rep', 'customer', 'rep']);
+    expect(snap.map((h) => h.speaker)).toEqual(['founder', 'customer', 'founder']);
   });
 
   test('lastFromOtherSpeaker', () => {
     const tail = new HotTail();
-    tail.push(u('a', 'rep', 'do you have budget?'));
+    tail.push(u('a', 'founder', 'do you have budget?'));
     tail.push(u('b', 'customer', 'yes'));
     expect(tail.lastFromOtherSpeaker('customer')?.id).toBe('a');
-    expect(tail.lastFromOtherSpeaker('rep')?.id).toBe('b');
+    expect(tail.lastFromOtherSpeaker('founder')?.id).toBe('b');
   });
 
   test('lastFromOtherSpeaker returns null when none', () => {
     const tail = new HotTail();
-    tail.push(u('a', 'rep', 'hi'));
-    expect(tail.lastFromOtherSpeaker('rep')).toBeNull();
+    tail.push(u('a', 'founder', 'hi'));
+    expect(tail.lastFromOtherSpeaker('founder')).toBeNull();
   });
 });

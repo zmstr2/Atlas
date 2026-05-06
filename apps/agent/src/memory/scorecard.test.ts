@@ -4,7 +4,7 @@ import { createEmptyMemory } from './store';
 import type { MeetingMemory } from '@atlas/types';
 
 const baseStats = {
-  repWords: 100,
+  founderWords: 100,
   prospectWords: 100,
   turnsSinceLastRepQuestion: 0,
   turnsSinceLastNextStepProposal: 0,
@@ -113,8 +113,8 @@ describe('computeScorecard', () => {
 
   test('talk ratio passes through', () => {
     const memory = createEmptyMemory();
-    const sc = computeScorecard(memory, { ...baseStats, repWords: 200, prospectWords: 100 });
-    expect(sc.talkRatio.repWords).toBe(200);
+    const sc = computeScorecard(memory, { ...baseStats, founderWords: 200, prospectWords: 100 });
+    expect(sc.talkRatio.founderWords).toBe(200);
     expect(sc.talkRatio.prospectWords).toBe(100);
   });
 });

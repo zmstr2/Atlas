@@ -270,11 +270,11 @@ function routeEvent(
     return;
   }
 
-  // Outbound rep transcript (Whisper-1 transcribes mic).
+  // Outbound founder transcript (Whisper-1 transcribes mic).
   if (type === 'conversation.item.input_audio_transcription.completed') {
     events.transcript?.({
       type: 'transcript',
-      speaker: 'rep',
+      speaker: 'founder',
       text: String(payload.transcript ?? ''),
       itemId: String(payload.item_id ?? `r-${Date.now()}`),
       isFinal: true,

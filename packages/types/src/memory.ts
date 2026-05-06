@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SpeakerRoleSchema } from './utterance';
 
 export const FactSchema = z.object({
   id: z.string(),
@@ -27,7 +28,7 @@ export const ConcernSchema = z.object({
 export const OpenLoopSchema = z.object({
   id: z.string(),
   description: z.string(),
-  owner: z.enum(['rep', 'customer']),
+  owner: z.enum(['founder', 'customer']),
   status: z.enum(['open', 'addressed']),
 });
 
@@ -64,7 +65,7 @@ export type FlowTag = z.infer<typeof FlowTagSchema>;
 
 export const FlowEntrySchema = z.object({
   turnId: z.string(),
-  speaker: z.enum(['rep', 'customer']),
+  speaker: SpeakerRoleSchema,
   tag: FlowTagSchema,
   content: z.string(),
   utteranceIds: z.array(z.string()),
@@ -123,7 +124,7 @@ export const QualScorecardSchema = z.object({
   hardDisqualify: z.boolean(),
   softDisqualifySignals: z.array(z.string()),
   talkRatio: z.object({
-    repWords: z.number(),
+    founderWords: z.number(),
     prospectWords: z.number(),
   }),
   turnsSinceLastRepQuestion: z.number(),
@@ -188,7 +189,7 @@ export function emptyScorecard(): QualScorecard {
     pushQueue: ['need', 'budget', 'authority', 'timeline', 'champion', 'metrics', 'economicBuyer', 'decisionProcess', 'decisionCriteria'],
     hardDisqualify: false,
     softDisqualifySignals: [],
-    talkRatio: { repWords: 0, prospectWords: 0 },
+    talkRatio: { founderWords: 0, prospectWords: 0 },
     turnsSinceLastRepQuestion: 0,
     turnsSinceLastNextStepProposal: 0,
     callMinute: 0,
