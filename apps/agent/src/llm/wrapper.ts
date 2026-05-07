@@ -1,6 +1,8 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { generateObject, streamObject, type LanguageModel } from 'ai';
+import { generateObject, generateText, streamObject, type LanguageModel } from 'ai';
 import type { ZodType } from 'zod';
+import { getCostContext } from './context';
+import { incrementUserSpend, incrementCallCost, DEMO_USER_ID } from '../db/sqlite';
 
 // Permissive provider options — narrowed at call sites by AI SDK's SharedV3ProviderOptions.
 type ProviderOptionsLite = Record<string, Record<string, string | number | boolean>>;
@@ -83,6 +85,35 @@ function estimateCost(model: string, tokensIn: number, tokensOut: number): numbe
   return tokensIn * rates.in + tokensOut * rates.out;
 }
 
+/**
+ * Attribute a completed LLM call's cost to the active user + call. Read from
+ * AsyncLocalStorage so we don't have to thread userId/callId through every
+ * agent signature. No-op when there's no active context (scripts, tests, the
+ * web demo's DEMO_USER_ID path is allowed).
+ *
+ * Fire-and-forget: DB writes happen synchronously here (Bun sqlite is sync),
+ * but we wrap in try/catch so a write failure can never break the LLM path.
+ */
+function recordCostFromContext(costUsd: number): void {
+  const ctx = getCostContext();
+  if (!ctx) return;
+  try {
+    // Demo flow uses DEMO_USER_ID — still increment so the demo $/day cap
+    // continues to reflect actual spend.
+    if (ctx.userId && ctx.userId !== '') {
+      incrementUserSpend(ctx.userId, costUsd);
+    }
+    if (ctx.callId) {
+      incrementCallCost(ctx.callId, costUsd);
+    }
+  } catch (err) {
+    console.error('[llm wrapper] recordCostFromContext failed', err);
+  }
+}
+
+// Suppress unused-import warning when DEMO_USER_ID isn't referenced directly.
+void DEMO_USER_ID;
+
 export function getCallLog(): LLMCallRecord[] {
   return [...callLog];
 }
@@ -124,14 +155,11 @@ export async function llmGenerateObject<T>(opts: {
 
     const latencyMs = Date.now() - start;
     const usage = result.usage;
-    callLog.push({
-      step: opts.step,
-      model: modelId,
-      latencyMs,
-      tokensIn: (usage.inputTokens ?? 0),
-      tokensOut: (usage.outputTokens ?? 0),
-      costUsd: estimateCost(modelId, (usage.inputTokens ?? 0), (usage.outputTokens ?? 0)),
-    });
+    const tokensIn = usage.inputTokens ?? 0;
+    const tokensOut = usage.outputTokens ?? 0;
+    const costUsd = estimateCost(modelId, tokensIn, tokensOut);
+    callLog.push({ step: opts.step, model: modelId, latencyMs, tokensIn, tokensOut, costUsd });
+    recordCostFromContext(costUsd);
 
     return result.object;
   } catch (err) {
@@ -178,19 +206,70 @@ export function llmStreamObject<T>(opts: {
     ...(providerOpts ? { providerOptions: providerOpts } : {}),
   });
 
-  // Log on completion (non-blocking) and clear timeout
+  // Log on completion (non-blocking) and clear timeout. We capture the
+  // cost-context HERE (synchronously, while the AsyncLocalStorage frame is
+  // still active) — by the time `usage` resolves the caller may have
+  // returned and the ALS store is gone.
+  const ctxAtCallTime = getCostContext();
   stream.usage.then((usage) => {
     clearTimeout(timer);
     const latencyMs = Date.now() - start;
-    callLog.push({
-      step: opts.step,
-      model: modelId,
-      latencyMs,
-      tokensIn: (usage.inputTokens ?? 0),
-      tokensOut: (usage.outputTokens ?? 0),
-      costUsd: estimateCost(modelId, (usage.inputTokens ?? 0), (usage.outputTokens ?? 0)),
-    });
+    const tokensIn = usage.inputTokens ?? 0;
+    const tokensOut = usage.outputTokens ?? 0;
+    const costUsd = estimateCost(modelId, tokensIn, tokensOut);
+    callLog.push({ step: opts.step, model: modelId, latencyMs, tokensIn, tokensOut, costUsd });
+    if (ctxAtCallTime) {
+      try {
+        if (ctxAtCallTime.userId) incrementUserSpend(ctxAtCallTime.userId, costUsd);
+        if (ctxAtCallTime.callId) incrementCallCost(ctxAtCallTime.callId, costUsd);
+      } catch (err) {
+        console.error('[llm wrapper] streamObject cost record failed', err);
+      }
+    }
   }).catch(() => { clearTimeout(timer); });
 
   return stream;
+}
+
+/**
+ * Free-form text completion. Used by the follow-up email agent — the output
+ * is prose, so structured output isn't appropriate. Cost is tracked the
+ * same way as llmGenerateObject.
+ */
+export async function llmGenerateText(opts: {
+  step: string;
+  modelKey: ModelKey;
+  prompt: string;
+  system?: string;
+  maxRetries?: number;
+}): Promise<string> {
+  const modelId = MODELS[opts.modelKey];
+  const start = Date.now();
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutFor(opts.modelKey));
+  const providerOpts = providerOptionsFor(opts.modelKey);
+
+  try {
+    const result = await generateText({
+      model: getModel(opts.modelKey),
+      prompt: opts.prompt,
+      system: opts.system,
+      maxRetries: opts.maxRetries ?? 1,
+      abortSignal: controller.signal,
+      ...(providerOpts ? { providerOptions: providerOpts } : {}),
+    });
+
+    const latencyMs = Date.now() - start;
+    const usage = result.usage;
+    const tokensIn = usage.inputTokens ?? 0;
+    const tokensOut = usage.outputTokens ?? 0;
+    const costUsd = estimateCost(modelId, tokensIn, tokensOut);
+    callLog.push({ step: opts.step, model: modelId, latencyMs, tokensIn, tokensOut, costUsd });
+    recordCostFromContext(costUsd);
+
+    return result.text;
+  } finally {
+    clearTimeout(timer);
+  }
 }

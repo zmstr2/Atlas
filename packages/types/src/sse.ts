@@ -55,6 +55,30 @@ export const FactsUiDeltaEventSchema = z.object({
   ui: CallFactsUISchema,
 });
 
+// Post-call chain events. Emitted by `runPostCallChain` after the call ends —
+// the frontend redirects to the coaching view immediately and these stream
+// in as each agent finishes.
+export const CoachingReadyEventSchema = z.object({
+  type: z.literal('coaching_ready'),
+  callId: z.string(),
+  // Loose shape for now — frontend renders it dynamically while the coaching
+  // artifact schema is still iterating.
+  artifact: z.record(z.string(), z.unknown()),
+});
+
+export const FollowupReadyEventSchema = z.object({
+  type: z.literal('followup_ready'),
+  callId: z.string(),
+  email: z.string(),
+});
+
+export const PostCallFailedEventSchema = z.object({
+  type: z.literal('post_call_failed'),
+  callId: z.string(),
+  step: z.enum(['verdict', 'coaching', 'followup']),
+  message: z.string(),
+});
+
 export const SSEEventSchema = z.discriminatedUnion('type', [
   UtteranceEventSchema,
   MemoryDiffEventSchema,
@@ -65,6 +89,9 @@ export const SSEEventSchema = z.discriminatedUnion('type', [
   SuggestionEventSchema,
   MemoryPatchAppliedEventSchema,
   FactsUiDeltaEventSchema,
+  CoachingReadyEventSchema,
+  FollowupReadyEventSchema,
+  PostCallFailedEventSchema,
 ]);
 
 export type SSEEvent = z.infer<typeof SSEEventSchema>;
@@ -77,3 +104,6 @@ export type CallEndEvent = z.infer<typeof CallEndEventSchema>;
 export type SuggestionEvent = z.infer<typeof SuggestionEventSchema>;
 export type MemoryPatchAppliedEvent = z.infer<typeof MemoryPatchAppliedEventSchema>;
 export type FactsUiDeltaEvent = z.infer<typeof FactsUiDeltaEventSchema>;
+export type CoachingReadyEvent = z.infer<typeof CoachingReadyEventSchema>;
+export type FollowupReadyEvent = z.infer<typeof FollowupReadyEventSchema>;
+export type PostCallFailedEvent = z.infer<typeof PostCallFailedEventSchema>;

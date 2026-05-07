@@ -9,6 +9,7 @@ import { runRepWatcher } from '../agents/repWatcher';
 import { runSuggester, type RecentSuggestionEntry } from '../agents/suggester';
 import { broadcastEvent, updateSessionMemory } from '../sse/handler';
 import { saveMemorySnapshot, recordUtterance, recordSuggestion } from '../db/sqlite';
+import { costContext } from '../llm/context';
 
 export type PipelineSession = {
   callId: string;
@@ -106,6 +107,17 @@ function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, spe
 }
 
 export async function processUtterance(session: PipelineSession, utterance: Utterance) {
+  // Establish the cost-tracking context for this turn. Every LLM call made
+  // (transitively) inside this function — memory agent, suggester, panel
+  // agent — reads userId/callId from this AsyncLocalStorage frame and
+  // attributes cost back to the right user without us having to thread
+  // userId through every agent signature.
+  return costContext.run({ userId: session.userId, callId: session.callId }, () =>
+    processUtteranceInner(session, utterance),
+  );
+}
+
+async function processUtteranceInner(session: PipelineSession, utterance: Utterance) {
   const { callId, userId, brief, store, hotTail, transcript } = session;
 
   // Synchronous bookkeeping

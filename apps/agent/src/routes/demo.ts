@@ -5,6 +5,7 @@ import { createSSEStream } from '../sse/handler';
 import { createPipelineSession, registerSession, processUtterance, removeSession } from './pipeline';
 import { createCall, finalizeCall, checkAndIncrementIpSession, getGlobalDailySpendUsd, DEMO_USER_ID } from '../db/sqlite';
 import { clearCallLog } from '../llm/wrapper';
+import { runPostCallChain } from './postCall';
 import { ReplayTimer } from '../replay/timer';
 import type { PreCallBrief, Utterance } from '@atlas/types';
 import { broadcastEvent } from '../sse/handler';
@@ -83,8 +84,16 @@ demoRoutes.post('/start', async (c) => {
     onEnd: () => {
       broadcastEvent(callId, { type: 'call_end', callId });
       finalizeCall(callId, DEMO_USER_ID);
-      removeSession(callId);
-      clearCallLog();
+      // Fire-and-forget post-call chain — verdict / coaching / follow-up
+      // stream in via SSE while the user is on the coaching view. Session
+      // teardown waits until the chain finishes so the agents can read
+      // memory + transcript off it.
+      void runPostCallChain({ callId, userId: DEMO_USER_ID, session, brief })
+        .catch((err) => console.error('[demo] post-call chain failed', callId, err))
+        .finally(() => {
+          removeSession(callId);
+          clearCallLog();
+        });
     },
   });
 
