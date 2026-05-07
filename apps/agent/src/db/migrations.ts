@@ -177,6 +177,27 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    name: '007_add_post_call_status_columns',
+    run(db) {
+      // Each post-call agent (verdict / coaching / followup) writes its own
+      // status column on completion. Values:
+      //   NULL       — not run yet (chain still in flight or call still active)
+      //   'ok'       — agent completed and persisted its artifact
+      //   'failed:…' — agent threw; suffix is the truncated error message
+      // Without this, the frontend can't tell "still processing" from
+      // "permanently failed" after an SSE drop + reload.
+      if (!tableHasColumn(db, 'calls', 'verdict_status')) {
+        db.exec(`ALTER TABLE calls ADD COLUMN verdict_status TEXT`);
+      }
+      if (!tableHasColumn(db, 'calls', 'coaching_status')) {
+        db.exec(`ALTER TABLE calls ADD COLUMN coaching_status TEXT`);
+      }
+      if (!tableHasColumn(db, 'calls', 'followup_status')) {
+        db.exec(`ALTER TABLE calls ADD COLUMN followup_status TEXT`);
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: Database): void {

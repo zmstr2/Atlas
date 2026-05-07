@@ -75,7 +75,7 @@ export const FollowupReadyEventSchema = z.object({
 export const PostCallFailedEventSchema = z.object({
   type: z.literal('post_call_failed'),
   callId: z.string(),
-  step: z.enum(['verdict', 'coaching', 'followup']),
+  step: z.enum(['verdict', 'coaching', 'followup', 'chain']),
   message: z.string(),
 });
 

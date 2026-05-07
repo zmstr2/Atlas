@@ -5,6 +5,7 @@ import { realtimeRoutes } from './realtime/session';
 import { chatRoutes } from './routes/chat';
 import { ingestRoutes } from './routes/ingest';
 import { requireAuth } from './auth/middleware';
+import { getCostAttributionFailureCount } from './db/sqlite';
 
 // CORS:
 //   - Web demo origin (apps/web on Vercel) is allowed via WEB_ORIGIN.
@@ -24,14 +25,18 @@ const allowedOrigins = [
 
 export const app = new Hono();
 
+// Pass the array directly so unmatched origins get no Access-Control-Allow-Origin
+// header at all (browser blocks the response). The previous function-form
+// fell through to allowedOrigins[0], which was harmless to the browser but
+// a footgun for anyone reading the code.
 app.use('*', cors({
-  origin: (origin) => (allowedOrigins.includes(origin) ? origin : allowedOrigins[0]),
+  origin: allowedOrigins,
   allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Call-Id', 'content-type', 'authorization', 'x-call-id'],
 }));
 
-// Authenticated, multi-tenant routes. Lane B will register `/calls/*` routes;
-// this middleware applies whenever those routes are mounted.
+// requireAuth runs before any /calls/* handler. Verifies a Supabase JWT and
+// sets userId/userEmail on the Hono context.
 app.use('/calls/*', requireAuth());
 
 // Public, unauthenticated routes (web demo + realtime + chat + health).
@@ -40,4 +45,9 @@ app.route('/realtime', realtimeRoutes);
 app.route('/chat', chatRoutes);
 app.route('/calls', ingestRoutes);
 
-app.get('/health', (c) => c.json({ ok: true }));
+app.get('/health', (c) =>
+  c.json({
+    ok: true,
+    costAttributionFailures: getCostAttributionFailureCount(),
+  }),
+);

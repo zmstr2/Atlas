@@ -195,3 +195,57 @@ describe('demo sentinel', () => {
     expect(DEMO_USER_ID).toBe('__demo__');
   });
 });
+
+describe('incrementUserSpend — concurrent semantics', () => {
+  test('100 parallel increments for the same (user, day) sum exactly', async () => {
+    _resetDbForTests();
+    const userId = 'race-user';
+    const perCall = 0.01;
+    await Promise.all(
+      Array.from({ length: 100 }, () =>
+        Promise.resolve(incrementUserSpend(userId, perCall, 1)),
+      ),
+    );
+    // bun:sqlite writes are synchronous + single-threaded, so this is a
+    // contract test rather than a true race. The point: no over- or
+    // under-count. If we ever swap the backend, this test must keep passing.
+    const total = getDailySpendUsd(userId);
+    expect(total).toBeCloseTo(perCall * 100, 6);
+  });
+});
+
+describe('setPostCallStatus + cost-attribution counter', () => {
+  test('writes to the right column per step', async () => {
+    _resetDbForTests();
+    const { setPostCallStatus } = await import('./sqlite');
+    const userId = 'status-user';
+    createCall('call-status-1', userId, { script: 'x' });
+
+    setPostCallStatus('call-status-1', 'verdict', 'ok');
+    setPostCallStatus('call-status-1', 'coaching', 'failed:LLM timeout');
+
+    const row = loadCall('call-status-1', userId);
+    expect(row).not.toBeNull();
+    expect(row!.verdict_status).toBe('ok');
+    expect(row!.coaching_status).toBe('failed:LLM timeout');
+    expect(row!.followup_status).toBeNull();
+  });
+
+  test('truncates oversized error messages to 500 chars', async () => {
+    _resetDbForTests();
+    const { setPostCallStatus } = await import('./sqlite');
+    const userId = 'status-user';
+    createCall('call-status-2', userId, { script: 'x' });
+
+    setPostCallStatus('call-status-2', 'verdict', 'x'.repeat(2000));
+
+    const row = loadCall('call-status-2', userId);
+    expect(row!.verdict_status!.length).toBeLessThanOrEqual(500);
+  });
+
+  test('cost-attribution failure counter exposed via getCostAttributionFailureCount', async () => {
+    const { getCostAttributionFailureCount, _resetCostAttributionFailureCount } = await import('./sqlite');
+    _resetCostAttributionFailureCount();
+    expect(getCostAttributionFailureCount()).toBe(0);
+  });
+});

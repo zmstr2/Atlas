@@ -23,8 +23,10 @@ export type SuggestionRecord = {
 
 export type CoachState = {
   callId: string;
-  // TODO(merge): require userId once Lane A merges (auth middleware).
-  // Coach voice flow currently has no auth — falls back to DEMO_USER_ID.
+  // Coach realtime flow is intentionally unauthenticated (mounted on the
+  // public /realtime route), so userId is DEMO_USER_ID here for spend
+  // attribution. Real desktop calls go through /calls/* with a JWT-derived
+  // userId — this state struct is never used on that path.
   userId: string;
   personaId: PersonaId;
   persona: PersonaConfig;

@@ -50,7 +50,9 @@ describe('public routes stay unauthenticated', () => {
   test('GET /health → 200 with no Authorization header', async () => {
     const res = await app.request('/health');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(typeof body.costAttributionFailures).toBe('number');
   });
 
   test('GET /demo/brief/jordan → not 401 with no Authorization header', async () => {

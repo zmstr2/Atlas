@@ -226,7 +226,10 @@ export function llmStreamObject<T>(opts: {
         console.error('[llm wrapper] streamObject cost record failed', err);
       }
     }
-  }).catch(() => { clearTimeout(timer); });
+  }).catch((err) => {
+    clearTimeout(timer);
+    console.error('[llm wrapper] streamObject usage promise rejected', opts.step, err);
+  });
 
   return stream;
 }
