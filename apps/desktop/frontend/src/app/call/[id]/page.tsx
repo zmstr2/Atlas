@@ -14,8 +14,21 @@ import { TranscriptView } from '@/components/TranscriptView';
 import { MemoryPanel } from '@/components/MemoryPanel';
 import { SuggestionBar } from '@/components/SuggestionBar';
 import { PreCallBriefHeader } from '@/components/PreCallBrief';
+import { AuthGate } from '@/components/AuthGate';
 
-export default function LiveCallPage({ params }: { params: { id: string } }) {
+export default function LiveCallPageRoute({
+  params,
+}: {
+  params: { id: string };
+}) {
+  return (
+    <AuthGate>
+      <LiveCallPage params={params} />
+    </AuthGate>
+  );
+}
+
+function LiveCallPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const callId = params.id;
 
@@ -61,7 +74,9 @@ export default function LiveCallPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     if (ended) return;
-    const es = streamCall(callId, (ev: SSEEventLike) => {
+    let es: EventSource | null = null;
+    let cancelled = false;
+    streamCall(callId, (ev: SSEEventLike) => {
       switch (ev.type) {
         case 'utterance': {
           const u = ev.utterance;
@@ -112,8 +127,21 @@ export default function LiveCallPage({ params }: { params: { id: string } }) {
           setError(ev.message);
           break;
       }
-    });
-    return () => es.close();
+    })
+      .then((source) => {
+        if (cancelled) {
+          source.close();
+        } else {
+          es = source;
+        }
+      })
+      .catch((err) => {
+        console.warn('[call] streamCall failed', err);
+      });
+    return () => {
+      cancelled = true;
+      es?.close();
+    };
   }, [callId, ended]);
 
   async function handleEndCall() {

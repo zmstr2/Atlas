@@ -3,15 +3,28 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { listCalls, type CallSummary } from '@/lib/agent';
+import { AuthGate } from '@/components/AuthGate';
+import { getSession, signOut } from '@/lib/supabase';
 
 export default function HomePage() {
+  return (
+    <AuthGate>
+      <HomePageInner />
+    </AuthGate>
+  );
+}
+
+function HomePageInner() {
   const [calls, setCalls] = useState<CallSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     listCalls()
       .then((res) => setCalls(res.calls))
       .catch((err) => setError(err.message));
+    getSession().then((s) => setEmail(s?.user?.email ?? null));
   }, []);
 
   return (
@@ -22,12 +35,43 @@ export default function HomePage() {
             <h1 className="font-display text-4xl mb-2">Atlas</h1>
             <p className="text-fg-secondary">Live coaching for sales calls.</p>
           </div>
-          <Link
-            href="/call/new"
-            className="px-4 py-2 bg-accent text-white rounded-md hover:bg-accent-hover transition-colors text-sm font-medium"
-          >
-            New call
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/call/new"
+              className="px-4 py-2 bg-accent text-white rounded-md hover:bg-accent-hover transition-colors text-sm font-medium"
+            >
+              New call
+            </Link>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="w-9 h-9 rounded-full bg-bg-elevated border border-border text-xs font-medium text-fg-secondary hover:border-accent/50 transition-colors"
+                aria-label="Account menu"
+              >
+                {email ? email.slice(0, 1).toUpperCase() : '?'}
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-bg-elevated border border-border rounded-md shadow-lg p-2 z-10">
+                  {email && (
+                    <div className="px-2 py-1.5 text-xs text-fg-muted truncate">
+                      {email}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setMenuOpen(false);
+                      await signOut();
+                    }}
+                    className="w-full text-left px-2 py-1.5 text-sm rounded-md hover:bg-bg-muted text-fg-primary"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </header>
 
         <section>

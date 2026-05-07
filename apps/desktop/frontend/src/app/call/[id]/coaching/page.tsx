@@ -3,8 +3,21 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getCall, type CallDetail } from '@/lib/agent';
+import { AuthGate } from '@/components/AuthGate';
 
-export default function CoachingPage({ params }: { params: { id: string } }) {
+export default function CoachingPageRoute({
+  params,
+}: {
+  params: { id: string };
+}) {
+  return (
+    <AuthGate>
+      <CoachingPage params={params} />
+    </AuthGate>
+  );
+}
+
+function CoachingPage({ params }: { params: { id: string } }) {
   const [detail, setDetail] = useState<CallDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 

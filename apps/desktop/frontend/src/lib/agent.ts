@@ -1,6 +1,10 @@
-// HTTP client wrapping the Atlas Bun sidecar at http://127.0.0.1:3001.
-// Tauri spawns the sidecar on app launch; this module is the only place in
-// the frontend that knows where it lives.
+// HTTP client for the Atlas agent.
+//
+// Reads NEXT_PUBLIC_AGENT_URL — in production this is the Railway-hosted
+// agent, in dev it defaults to http://127.0.0.1:3001 for backwards compat.
+//
+// Every request carries the Supabase JWT in `Authorization: Bearer <token>`.
+// On 401 we sign the user out (which kicks them back to /login via AuthGate).
 
 import type {
   PreCallBrief,
@@ -10,20 +14,40 @@ import type {
   Verdict,
   SpeakerRole,
 } from '@atlas/types';
+import { getAccessToken, signOut } from './supabase';
 
 const AGENT_BASE =
   process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://127.0.0.1:3001';
+
+export class UnauthorizedError extends Error {
+  constructor(message = 'Not authenticated') {
+    super(message);
+    this.name = 'UnauthorizedError';
+  }
+}
 
 async function http<T>(
   method: 'GET' | 'POST' | 'PATCH',
   path: string,
   body?: unknown,
 ): Promise<T> {
+  const token = await getAccessToken();
+  if (!token) {
+    throw new UnauthorizedError();
+  }
   const res = await fetch(`${AGENT_BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401) {
+    // Token rejected — clear local session so AuthGate redirects to /login.
+    await signOut().catch(() => {});
+    throw new UnauthorizedError(`agent ${method} ${path} → 401`);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`agent ${method} ${path} → ${res.status} ${text}`);
@@ -112,11 +136,19 @@ export async function relabelParticipant(
 }
 
 // SSE stream — subscribe to live pipeline events.
-export function streamCall(
+//
+// EventSource doesn't support custom headers in browsers/webviews, so we pass
+// the JWT as a `?token=…` query param. Lane A's auth middleware needs to
+// recognize the token query param for this route specifically.
+export async function streamCall(
   callId: string,
   onEvent: (event: SSEEventLike) => void,
-): EventSource {
-  const url = `${AGENT_BASE}/calls/${callId}/stream`;
+): Promise<EventSource> {
+  const token = await getAccessToken();
+  if (!token) {
+    throw new UnauthorizedError();
+  }
+  const url = `${AGENT_BASE}/calls/${callId}/stream?token=${encodeURIComponent(token)}`;
   const es = new EventSource(url);
   es.onmessage = (e) => {
     try {
