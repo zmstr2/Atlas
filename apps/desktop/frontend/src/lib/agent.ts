@@ -14,7 +14,7 @@ import type {
   Verdict,
   SpeakerRole,
 } from '@atlas/types';
-import { getAccessToken, signOut } from './supabase';
+import { getAccessToken, signOut, supabase } from './supabase';
 
 const AGENT_BASE =
   process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://127.0.0.1:3001';
@@ -30,6 +30,7 @@ async function http<T>(
   method: 'GET' | 'POST' | 'PATCH',
   path: string,
   body?: unknown,
+  _retried = false,
 ): Promise<T> {
   const token = await getAccessToken();
   if (!token) {
@@ -44,7 +45,21 @@ async function http<T>(
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (res.status === 401) {
-    // Token rejected — clear local session so AuthGate redirects to /login.
+    // First 401 — try one refresh + retry before giving up. Covers the case
+    // where Supabase's auto-refresh hasn't fired yet but the agent's already
+    // rejecting an expired JWT.
+    if (!_retried) {
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (!error && data.session?.access_token) {
+          return http<T>(method, path, body, true);
+        }
+      } catch {
+        // fall through to signOut
+      }
+    }
+    // Refresh failed (or this was already the retry) — clear session so
+    // AuthGate redirects to /login.
     await signOut().catch(() => {});
     throw new UnauthorizedError(`agent ${method} ${path} → 401`);
   }
@@ -140,6 +155,12 @@ export async function relabelParticipant(
 // EventSource doesn't support custom headers in browsers/webviews, so we pass
 // the JWT as a `?token=…` query param. Lane A's auth middleware needs to
 // recognize the token query param for this route specifically.
+//
+// Refresh strategy: EventSource has no clean retry primitive, so on the first
+// error we close the stream, force a Supabase refreshSession(), and reopen
+// with the new token. If the second attempt also errors, we sign out. The
+// returned object is a wrapper so callers can call `.close()` even after a
+// reconnect under the hood; we don't try to expose the inner EventSource.
 export async function streamCall(
   callId: string,
   onEvent: (event: SSEEventLike) => void,
@@ -148,19 +169,76 @@ export async function streamCall(
   if (!token) {
     throw new UnauthorizedError();
   }
-  const url = `${AGENT_BASE}/calls/${callId}/stream?token=${encodeURIComponent(token)}`;
-  const es = new EventSource(url);
-  es.onmessage = (e) => {
-    try {
-      onEvent(JSON.parse(e.data));
-    } catch (err) {
-      console.warn('[agent] failed to parse SSE event', err);
-    }
+
+  let current: EventSource | null = null;
+  let attemptedRefresh = false;
+  let closedByUser = false;
+
+  const open = (jwt: string) => {
+    const url = `${AGENT_BASE}/calls/${callId}/stream?token=${encodeURIComponent(jwt)}`;
+    const es = new EventSource(url);
+    es.onmessage = (e) => {
+      try {
+        onEvent(JSON.parse(e.data));
+      } catch (err) {
+        console.warn('[agent] failed to parse SSE event', err);
+      }
+    };
+    es.onerror = async () => {
+      if (closedByUser) return;
+      // EventSource fires `onerror` on transient disconnects too — but if we
+      // were going to recover via the browser's built-in reconnect, the
+      // `readyState` would be CONNECTING (0). When it's CLOSED (2), it's a
+      // hard failure (likely 401 auth) and we step in.
+      if (es.readyState !== EventSource.CLOSED) return;
+      if (attemptedRefresh) {
+        console.warn('[agent] SSE failed after refresh; signing out');
+        await signOut().catch(() => {});
+        return;
+      }
+      attemptedRefresh = true;
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (error || !data.session?.access_token) {
+          await signOut().catch(() => {});
+          return;
+        }
+        current = open(data.session.access_token);
+      } catch (err) {
+        console.warn('[agent] SSE refresh-and-reopen failed', err);
+        await signOut().catch(() => {});
+      }
+    };
+    return es;
   };
-  es.onerror = () => {
-    // Browser auto-reconnects; nothing to do here.
-  };
-  return es;
+
+  current = open(token);
+
+  // Return a proxy EventSource-like object so the caller's existing
+  // `.close()` keeps working even after we've swapped the inner instance.
+  // We can't actually subclass EventSource, so we hand back the live one
+  // and shim `close` via a Proxy-ish pattern.
+  const proxy = new Proxy({} as EventSource, {
+    get(_target, prop) {
+      if (prop === 'close') {
+        return () => {
+          closedByUser = true;
+          current?.close();
+        };
+      }
+      // @ts-expect-error — passthrough to whichever instance is current
+      const value = current?.[prop];
+      return typeof value === 'function' ? value.bind(current) : value;
+    },
+    set(_target, prop, value) {
+      if (current) {
+        // @ts-expect-error — passthrough setter (e.g. onmessage override)
+        current[prop] = value;
+      }
+      return true;
+    },
+  });
+  return proxy;
 }
 
 // SSE event shape — mirrors packages/types/src/sse.ts but kept local so the

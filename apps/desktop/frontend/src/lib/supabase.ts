@@ -21,7 +21,7 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 const STORE_FILE = 'auth.dat';
 
-function isTauri(): boolean {
+export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
@@ -155,4 +155,92 @@ export function onAuthStateChange(
     callback(session);
   });
   return () => data.subscription.unsubscribe();
+}
+
+// ── Tauri bridge: keep Rust core's auth token in sync with Supabase JWT ─────
+//
+// Supabase JS auto-refreshes JWTs ~5 min before expiry on its internal
+// scheduler and emits a `TOKEN_REFRESHED` event via `onAuthStateChange`. We
+// listen for that and forward the new access_token to the Tauri Rust core
+// (via the `set_atlas_auth_token` command) so atlas_bridge POSTs always carry
+// a fresh JWT.
+//
+// We also run a defensive 60s poll: if the next expiry is < 5 min away and
+// Supabase hasn't refreshed yet (e.g. webview backgrounded), we force a
+// refresh ourselves.
+//
+// Returns a cleanup function that unsubscribes the auth listener and clears
+// the polling interval. Call from a top-level client component on mount.
+
+const REFRESH_GUARD_SECONDS = 300; // 5 min before expiry
+const REFRESH_POLL_MS = 60_000;
+
+async function pushTokenToTauri(token: string): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('set_atlas_auth_token', { token });
+  } catch (err) {
+    console.warn('[supabase] failed to push token to Tauri bridge', err);
+  }
+}
+
+async function clearTokenInTauri(): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('clear_atlas_auth_token');
+  } catch (err) {
+    console.warn('[supabase] failed to clear Tauri auth token', err);
+  }
+}
+
+export function initTauriBridge(): () => void {
+  // Subscribe to auth state changes. SIGNED_IN / TOKEN_REFRESHED /
+  // INITIAL_SESSION all carry a fresh access_token; SIGNED_OUT clears it.
+  const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    switch (event) {
+      case 'SIGNED_IN':
+      case 'TOKEN_REFRESHED':
+      case 'INITIAL_SESSION':
+        if (session?.access_token) {
+          void pushTokenToTauri(session.access_token);
+        }
+        break;
+      case 'SIGNED_OUT':
+        void clearTokenInTauri();
+        break;
+      default:
+        break;
+    }
+  });
+
+  // Defensive proactive refresh poll. Supabase normally handles this on its
+  // own schedule, but Next.js inside a Tauri webview can be backgrounded; we
+  // don't want a stale JWT lurking on a long call.
+  const interval =
+    typeof window === 'undefined'
+      ? null
+      : window.setInterval(async () => {
+          try {
+            const { data } = await supabase.auth.getSession();
+            const session = data.session;
+            if (!session) return;
+            const expiresAt = session.expires_at; // unix seconds
+            if (!expiresAt) return;
+            const now = Math.floor(Date.now() / 1000);
+            if (expiresAt - now < REFRESH_GUARD_SECONDS) {
+              await supabase.auth.refreshSession();
+            }
+          } catch (err) {
+            console.warn('[supabase] proactive refresh poll failed', err);
+          }
+        }, REFRESH_POLL_MS);
+
+  return () => {
+    sub.subscription.unsubscribe();
+    if (interval !== null && typeof window !== 'undefined') {
+      window.clearInterval(interval);
+    }
+  };
 }
