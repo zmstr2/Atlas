@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DM_Sans, Instrument_Serif } from 'next/font/google';
+import { TauriAuthBridge } from '@/components/TauriAuthBridge';
 import '../styles/globals.css';
 
 const dmSans = DM_Sans({
@@ -23,7 +24,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${dmSans.variable} ${instrumentSerif.variable}`}>
-      <body>{children}</body>
+      <body>
+        <TauriAuthBridge />
+        {children}
+      </body>
     </html>
   );
 }
