@@ -5,8 +5,17 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { startCall } from '@/lib/agent';
 import type { PreCallBrief } from '@atlas/types';
+import { AuthGate } from '@/components/AuthGate';
 
-export default function NewCallPage() {
+export default function NewCallPageRoute() {
+  return (
+    <AuthGate>
+      <NewCallPage />
+    </AuthGate>
+  );
+}
+
+function NewCallPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
