@@ -12,18 +12,15 @@ apps/desktop/
 │   ├── src/
 │   │   ├── app/            Atlas pages (page, call/new, call/[id], call/[id]/coaching)
 │   │   ├── components/     MemoryPanel, SuggestionBar, TranscriptView, PreCallBrief
-│   │   ├── lib/            agent.ts (sidecar HTTP client), cn.ts, types.ts
+│   │   ├── lib/            agent.ts (remote agent HTTP client), cn.ts, types.ts
 │   │   └── styles/         globals.css
 │   └── src-tauri/
 │       ├── src/
-│       │   ├── atlas_bridge.rs   ← spawns sidecar + forwards transcripts
+│       │   ├── atlas_bridge.rs   ← forwards transcripts to remote Atlas agent
 │       │   ├── lib.rs            (registers atlas_bridge)
 │       │   └── ...               (Meetily's audio + Whisper + Parakeet pipeline)
-│       ├── tauri.conf.json (atlas-agent declared in externalBin + shell:allow-execute)
-│       ├── binaries/       ← atlas-agent-<target-triple> binaries (gitignored)
+│       ├── tauri.conf.json (no sidecar; CSP allows Railway + Supabase)
 │       └── ...
-└── scripts/
-    └── build-sidecar.sh    cross-compile apps/agent into Tauri sidecar binaries
 ```
 
 ## What's done
@@ -48,18 +45,17 @@ apps/desktop/
 - Added `@atlas/types` as a workspace dependency
 - Added `typecheck` script; `tsc --noEmit` is clean
 
-### Step 3 — Tauri Rust integration (Cargo deps + atlas_bridge module + setup hooks)
-- Added `tauri-plugin-shell = "2.2.0"` to Cargo.toml (used to spawn the sidecar)
-- New module `src-tauri/src/atlas_bridge.rs`:
-  - `AtlasState` (active_call_id + sidecar_handle in mutexes)
-  - `spawn_sidecar(app)` — spawns the bundled `atlas-agent` binary with `ATLAS_DATA_DIR` set to `app_data_dir()/atlas-agent` and `PORT=3001`. Forwards stdout/stderr to logs.
-  - `install_event_forwarder(app)` — listens for `transcript-update` events, drops partials, maps `source` → `participantId` + speaker, and POSTs to `/calls/{callId}/utterance`.
-  - Tauri commands: `set_active_atlas_call`, `clear_active_atlas_call`, `atlas_sidecar_base_url`
-- `lib.rs` registers `atlas_bridge` module, `tauri_plugin_shell::init()`, `AtlasState`, the three commands, calls `spawn_sidecar` + `install_event_forwarder` in `setup()`
-- `tauri.conf.json` updates:
-  - `bundle.externalBin` includes `binaries/atlas-agent`
-  - Capability now allows `shell:allow-execute` on the atlas-agent sidecar
-  - CSP `connect-src` includes `http://127.0.0.1:3001`
+### Step 3 — Tauri Rust integration (atlas_bridge module + remote agent)
+- Module `src-tauri/src/atlas_bridge.rs`:
+  - `AtlasState` (active_call_id + auth_token in mutexes)
+  - `agent_base_url()` reads `ATLAS_AGENT_URL` env var at runtime (baked at build time), falls back to `https://atlas-agent.up.railway.app`
+  - `install_event_forwarder(app)` — listens for `transcript-update` events, drops partials, maps `source` → `participantId` + speaker, and POSTs to `${agent_base_url}/calls/{callId}/utterance` with the user's JWT in the `Authorization: Bearer <token>` header. If no token is set, logs a warning and skips.
+  - Tauri commands: `set_active_atlas_call`, `clear_active_atlas_call`, `atlas_agent_base_url`, `set_atlas_auth_token`, `clear_atlas_auth_token`
+- `lib.rs` registers `atlas_bridge` module, `AtlasState`, the five commands, and calls `install_event_forwarder` in `setup()`. No more `tauri-plugin-shell` and no sidecar spawn.
+- `tauri.conf.json`:
+  - No more `binaries/atlas-agent` in `externalBin`
+  - No more `shell:allow-execute` capability
+  - CSP `connect-src` includes `http://127.0.0.1:3001` (dev), `https://atlas-agent.up.railway.app` (prod), and `https://*.supabase.co` (auth)
 
 ## Source → speaker mapping (current heuristic)
 
@@ -72,24 +68,36 @@ The user can override mid-call via `PATCH /calls/:callId/participants/:participa
 ## How a call flows end-to-end
 
 ```
-1. User: clicks "New call" → /call/new (frontend)
-2. Frontend: POST http://127.0.0.1:3001/calls → { callId }
-3. Frontend: invoke('set_active_atlas_call', { callId })
-4. Frontend: navigate to /call/[id], opens SSE to /calls/:id/stream
-5. User: starts Meetily's recording (existing Meetily commands)
-6. Meetily Rust: emits transcript-update events as Whisper/Parakeet finalize chunks
-7. atlas_bridge: filters partials, POSTs to /calls/:id/utterance
-8. Atlas sidecar: pipeline → SSE → frontend renders memory + suggestions
-9. User: "End call" → POST /calls/:id/end → Tauri's clear_active_atlas_call → /coaching view
+1. User: signs into Supabase in the desktop app → frontend invokes
+   set_atlas_auth_token with the JWT
+2. User: clicks "New call" → /call/new (frontend)
+3. Frontend: POST ${ATLAS_AGENT_URL}/calls (Authorization: Bearer <jwt>) → { callId }
+4. Frontend: invoke('set_active_atlas_call', { callId })
+5. Frontend: navigate to /call/[id], opens SSE to /calls/:id/stream
+6. User: starts Meetily's recording (existing Meetily commands)
+7. Meetily Rust: emits transcript-update events as Whisper/Parakeet finalize chunks
+8. atlas_bridge: filters partials, POSTs to ${ATLAS_AGENT_URL}/calls/:id/utterance
+   with Authorization: Bearer <jwt>
+9. Atlas agent (Railway): pipeline → SSE → frontend renders memory + suggestions
+10. User: "End call" → POST /calls/:id/end → Tauri's clear_active_atlas_call → /coaching view
 ```
 
-## How to build the Atlas sidecar binaries
+## Configuring the agent URL
 
-```bash
-bun run build:sidecar
-```
+`ATLAS_AGENT_URL` (Rust) and `NEXT_PUBLIC_AGENT_URL` (frontend) point at the
+remote agent. In CI both are set from the `ATLAS_AGENT_URL` repo secret and
+baked into the desktop build via `tauri-action`. For local dev, set them in
+your shell or a `.env.local` to e.g. `http://127.0.0.1:3001` and run
+`bun run dev:agent` alongside `bun run dev:desktop`.
 
-Drops `atlas-agent-<target-triple>` binaries into `apps/desktop/frontend/src-tauri/binaries/`. Tauri's externalBin loader picks them up at build time based on the host's target triple.
+## Failure modes
+
+- **No auth token set** — `install_event_forwarder` logs a warning and drops
+  the utterance. The user needs to log in first.
+- **Agent unreachable / 5xx** — logged + emitted as `atlas-bridge-error`
+  Tauri event for the frontend to surface. No retry queue yet.
+- **JWT expired mid-call** — agent returns 401; surfaced via `atlas-bridge-error`.
+  Frontend (Lane C) should refresh the token and re-call `set_atlas_auth_token`.
 
 ## What's still TODO
 
@@ -123,4 +131,4 @@ GET    /calls/:callId                    → full call detail + coaching artifac
 GET    /calls/:callId/stream             → SSE stream of pipeline events
 ```
 
-All endpoints bind to `127.0.0.1` — no auth needed because the sidecar is only reachable from inside the Tauri app process tree.
+All endpoints now require `Authorization: Bearer <supabase-jwt>` since the agent is deployed remotely on Railway. The Tauri Rust core attaches the header on every utterance POST using the token cached via `set_atlas_auth_token`.

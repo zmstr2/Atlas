@@ -16,20 +16,12 @@ jobs:
         include:
           - platform: macos-14   # Apple Silicon runner
             target: aarch64-apple-darwin
-            sidecar_target: bun-darwin-arm64
-            sidecar_name: atlas-agent-aarch64-apple-darwin
           - platform: macos-13   # Intel runner
             target: x86_64-apple-darwin
-            sidecar_target: bun-darwin-x64
-            sidecar_name: atlas-agent-x86_64-apple-darwin
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            sidecar_target: bun-linux-x64
-            sidecar_name: atlas-agent-x86_64-unknown-linux-gnu
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            sidecar_target: bun-windows-x64
-            sidecar_name: atlas-agent-x86_64-pc-windows-msvc.exe
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -52,19 +44,15 @@ jobs:
       - name: Install JS deps
         run: bun install --frozen-lockfile
 
-      - name: Build Atlas agent sidecar
-        shell: bash
-        run: |
-          mkdir -p apps/desktop/frontend/src-tauri/binaries
-          bun build apps/agent/src/index.ts \
-            --compile \
-            --target=${{ matrix.sidecar_target }} \
-            --outfile=apps/desktop/frontend/src-tauri/binaries/${{ matrix.sidecar_name }}
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Atlas remote agent URL — baked into the desktop build at compile time.
+          # The Tauri Rust core reads ATLAS_AGENT_URL from env; the frontend
+          # reads NEXT_PUBLIC_AGENT_URL.
+          ATLAS_AGENT_URL: ${{ secrets.ATLAS_AGENT_URL }}
+          NEXT_PUBLIC_AGENT_URL: ${{ secrets.ATLAS_AGENT_URL }}
           # macOS code signing — set these in repo Secrets when ready.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
