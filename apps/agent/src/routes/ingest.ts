@@ -18,7 +18,19 @@ import {
   saveVerdict,
   updateCallStatus,
   upsertParticipant,
+  DEMO_USER_ID,
 } from '../db/sqlite';
+import type { Context } from 'hono';
+
+/**
+ * Pull the authenticated userId off the Hono context. Lane A's auth middleware
+ * sets `c.set('userId', payload.sub)` for /calls/* requests. Falls back to
+ * DEMO_USER_ID if (a) middleware wasn't applied (dev) or (b) the test bench
+ * runs these handlers directly without an auth wrapper.
+ */
+function getUserIdLoose(c: Context): string {
+  return (c.get('userId') as string | undefined) ?? DEMO_USER_ID;
+}
 import { createSSEStream, broadcastEvent } from '../sse/handler';
 import {
   createPipelineSession,
@@ -69,18 +81,19 @@ ingestRoutes.post('/', async (c) => {
     return c.json({ error: 'invalid_brief', detail: parsed.error.flatten() }, 400);
   }
 
+  const userId = getUserIdLoose(c);
   const callId = nanoid();
   const brief = parsed.data.brief;
   const prospectName = brief.prospect?.name ?? brief.lead?.name ?? null;
 
-  createCall(callId, {
+  createCall(callId, userId, {
     script: null,
     prospectName,
     meetingUrl: parsed.data.meetingUrl ?? null,
     brief,
   });
 
-  const session = createPipelineSession(callId, brief);
+  const session = createPipelineSession(callId, userId, brief);
   registerSession(session);
   speakerMaps.set(callId, new SpeakerMap());
 
@@ -183,7 +196,7 @@ ingestRoutes.post('/:callId/end', async (c) => {
     return c.json({ error: 'unknown_call', callId }, 404);
   }
 
-  finalizeCall(callId);
+  finalizeCall(callId, getUserIdLoose(c));
   broadcastEvent(callId, { type: 'call_end', callId });
   removeSession(callId);
   speakerMaps.delete(callId);
@@ -200,15 +213,16 @@ ingestRoutes.post('/:callId/end', async (c) => {
 // ── reads ──────────────────────────────────────────────────────────────────
 
 ingestRoutes.get('/', (c) => {
-  return c.json({ calls: listCalls(200) });
+  return c.json({ calls: listCalls(getUserIdLoose(c), 200) });
 });
 
 ingestRoutes.get('/:callId', (c) => {
   const callId = c.req.param('callId');
-  const call = loadCall(callId);
+  const userId = getUserIdLoose(c);
+  const call = loadCall(callId, userId);
   if (!call) return c.json({ error: 'unknown_call', callId }, 404);
 
-  const log = loadCallLog(callId);
+  const log = loadCallLog(callId, userId);
   const participants = loadParticipants(callId);
 
   return c.json({

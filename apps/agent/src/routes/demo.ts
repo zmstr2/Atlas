@@ -3,7 +3,7 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { createSSEStream } from '../sse/handler';
 import { createPipelineSession, registerSession, processUtterance, removeSession } from './pipeline';
-import { createCall, finalizeCall, checkAndIncrementIpSession, getDailySpendUsd } from '../db/sqlite';
+import { createCall, finalizeCall, checkAndIncrementIpSession, getGlobalDailySpendUsd, DEMO_USER_ID } from '../db/sqlite';
 import { clearCallLog } from '../llm/wrapper';
 import { ReplayTimer } from '../replay/timer';
 import type { PreCallBrief, Utterance } from '@atlas/types';
@@ -46,7 +46,7 @@ demoRoutes.post('/start', async (c) => {
   }
 
   // Global $/day ceiling — hard cap before per-IP increment so it can't be bypassed
-  const spentToday = getDailySpendUsd();
+  const spentToday = getGlobalDailySpendUsd();
   if (spentToday >= GLOBAL_DAILY_SPEND_USD) {
     return c.json({ error: 'Demo capacity reached, try again tomorrow', code: 'GLOBAL_LIMIT' }, 429);
   }
@@ -68,9 +68,9 @@ demoRoutes.post('/start', async (c) => {
   }
 
   const callId = nanoid();
-  createCall(callId, { script: body.script, brief });
+  createCall(callId, DEMO_USER_ID, { script: body.script, brief });
 
-  const session = createPipelineSession(callId, brief);
+  const session = createPipelineSession(callId, DEMO_USER_ID, brief);
   registerSession(session);
 
   // speedMultiplier > 1 for testing (e.g. ?speed=50). Defensive parse: bad input → 1.
@@ -82,7 +82,7 @@ demoRoutes.post('/start', async (c) => {
     onUtterance: (utterance) => processUtterance(session, utterance),
     onEnd: () => {
       broadcastEvent(callId, { type: 'call_end', callId });
-      finalizeCall(callId);
+      finalizeCall(callId, DEMO_USER_ID);
       removeSession(callId);
       clearCallLog();
     },

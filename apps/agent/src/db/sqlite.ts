@@ -7,7 +7,9 @@ import { runMigrations } from './migrations';
 // Resolve DB path. Precedence:
 //   1. SQLITE_PATH (legacy override, used by tests + demo)
 //   2. ATLAS_DATA_DIR/atlas.db (set by the Tauri shell at sidecar spawn time —
-//      points at the OS-standard app data dir on each platform)
+//      points at the OS-standard app data dir on each platform). With Lane D's
+//      remote-agent pivot, this is mostly historical: Railway sets its own
+//      working dir.
 //   3. ./atlas.db (dev default when running `bun run dev:agent` from the
 //      monorepo root)
 function resolveDbPath(): string {
@@ -22,21 +24,30 @@ function resolveDbPath(): string {
 const db = new Database(resolveDbPath(), { create: true });
 runMigrations(db);
 
+/** Sentinel userId for the public web demo flow (no auth required). */
+export const DEMO_USER_ID = '__demo__';
+
 // ── calls ──────────────────────────────────────────────────────────────────
 
 /**
  * Create a call row. `script` is set for legacy demo replay; for real
  * desktop calls pass null and supply prospect_name + brief_json instead.
+ *
+ * `userId` scopes the call to a Supabase auth user. The web demo uses
+ * `DEMO_USER_ID`. Multi-tenant queries (loadCall, listCalls, etc.) filter
+ * by userId so users can't see each other's calls.
  */
 export function createCall(
   id: string,
+  userId: string,
   opts: { script?: string | null; prospectName?: string | null; meetingUrl?: string | null; brief?: PreCallBrief | null } = {},
 ) {
   db.run(
-    `INSERT INTO calls (id, script, prospect_name, meeting_url, brief_json, status, started_at)
-     VALUES (?, ?, ?, ?, ?, 'active', ?)`,
+    `INSERT INTO calls (id, user_id, script, prospect_name, meeting_url, brief_json, status, started_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`,
     [
       id,
+      userId,
       opts.script ?? null,
       opts.prospectName ?? null,
       opts.meetingUrl ?? null,
@@ -53,10 +64,10 @@ export function saveMemorySnapshot(callId: string, memory: MeetingMemory) {
   );
 }
 
-export function finalizeCall(callId: string) {
+export function finalizeCall(callId: string, userId: string) {
   db.run(
-    `UPDATE calls SET ended_at = ?, status = 'ended' WHERE id = ?`,
-    [Date.now(), callId],
+    `UPDATE calls SET ended_at = ?, status = 'ended' WHERE id = ? AND user_id = ?`,
+    [Date.now(), callId, userId],
   );
 }
 
@@ -111,12 +122,12 @@ export function loadParticipants(callId: string): Array<{
 
 // ── utterances ─────────────────────────────────────────────────────────────
 
-export function recordUtterance(callId: string, u: Utterance) {
+export function recordUtterance(callId: string, userId: string, u: Utterance) {
   try {
     db.run(
-      `INSERT OR IGNORE INTO utterances (id, call_id, participant_id, speaker, text, start_ms, end_ms, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [u.id, callId, u.participantId ?? null, u.speaker, u.text, u.startMs, u.endMs, Date.now()],
+      `INSERT OR IGNORE INTO utterances (id, call_id, user_id, participant_id, speaker, text, start_ms, end_ms, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [u.id, callId, userId, u.participantId ?? null, u.speaker, u.text, u.startMs, u.endMs, Date.now()],
     );
   } catch (err) {
     console.error('[sqlite] recordUtterance failed', u.id, err);
@@ -127,6 +138,7 @@ export function recordUtterance(callId: string, u: Utterance) {
 
 export function recordSuggestion(
   callId: string,
+  userId: string,
   utteranceId: string,
   turnCounter: number,
   s: Suggestion,
@@ -135,12 +147,12 @@ export function recordSuggestion(
   try {
     db.run(
       `INSERT INTO suggestions (
-         call_id, utterance_id, turn_counter, agent,
+         call_id, user_id, utterance_id, turn_counter, agent,
          should_fire, suppressed, priority, play, markdown, reasoning,
          grounded_utterance_ids, grounded_anchor_turn_ids, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        callId, utteranceId, turnCounter, s.agent,
+        callId, userId, utteranceId, turnCounter, s.agent,
         s.shouldFire ? 1 : 0, suppressed ? 1 : 0,
         s.priority, s.play, s.markdown, s.reasoning,
         JSON.stringify(s.groundedInUtteranceIds),
@@ -158,6 +170,7 @@ export function recordSuggestion(
 export type LoadedUtteranceRow = {
   id: string;
   call_id: string;
+  user_id: string;
   participant_id: string | null;
   speaker: SpeakerRole;
   text: string;
@@ -169,6 +182,7 @@ export type LoadedUtteranceRow = {
 export type LoadedSuggestionRow = {
   id: number;
   call_id: string;
+  user_id: string;
   utterance_id: string;
   turn_counter: number;
   agent: 'prospect_suggester' | 'rep_watcher';
@@ -185,6 +199,7 @@ export type LoadedSuggestionRow = {
 
 export type LoadedCallRow = {
   id: string;
+  user_id: string;
   script: string | null;
   prospect_name: string | null;
   meeting_url: string | null;
@@ -197,44 +212,72 @@ export type LoadedCallRow = {
   follow_up_email: string | null;
 };
 
-export function loadCall(callId: string): LoadedCallRow | null {
+export function loadCall(callId: string, userId: string): LoadedCallRow | null {
   return db.query(
-    `SELECT id, script, prospect_name, meeting_url, brief_json, status,
+    `SELECT id, user_id, script, prospect_name, meeting_url, brief_json, status,
             started_at, ended_at, verdict, coaching_artifact, follow_up_email
-     FROM calls WHERE id = ?`,
-  ).get(callId) as LoadedCallRow | null;
+     FROM calls WHERE id = ? AND user_id = ?`,
+  ).get(callId, userId) as LoadedCallRow | null;
 }
 
-export function listCalls(limit = 100): Array<Pick<LoadedCallRow,
-  'id' | 'script' | 'prospect_name' | 'status' | 'started_at' | 'ended_at'
+export function listCalls(userId: string, limit = 100): Array<Pick<LoadedCallRow,
+  'id' | 'user_id' | 'script' | 'prospect_name' | 'status' | 'started_at' | 'ended_at'
 >> {
   return db.query(
-    `SELECT id, script, prospect_name, status, started_at, ended_at
-     FROM calls ORDER BY started_at DESC LIMIT ?`,
-  ).all(limit) as Array<Pick<LoadedCallRow,
-    'id' | 'script' | 'prospect_name' | 'status' | 'started_at' | 'ended_at'
+    `SELECT id, user_id, script, prospect_name, status, started_at, ended_at
+     FROM calls WHERE user_id = ? ORDER BY started_at DESC LIMIT ?`,
+  ).all(userId, limit) as Array<Pick<LoadedCallRow,
+    'id' | 'user_id' | 'script' | 'prospect_name' | 'status' | 'started_at' | 'ended_at'
   >>;
 }
 
-export function loadCallLog(callId: string): {
+export function loadCallLog(callId: string, userId: string): {
   utterances: LoadedUtteranceRow[];
   suggestions: LoadedSuggestionRow[];
 } {
   const utterances = db.query(
-    'SELECT * FROM utterances WHERE call_id = ? ORDER BY created_at ASC, id ASC',
-  ).all(callId) as LoadedUtteranceRow[];
+    'SELECT * FROM utterances WHERE call_id = ? AND user_id = ? ORDER BY created_at ASC, id ASC',
+  ).all(callId, userId) as LoadedUtteranceRow[];
   const suggestions = db.query(
-    'SELECT * FROM suggestions WHERE call_id = ? ORDER BY created_at ASC, id ASC',
-  ).all(callId) as LoadedSuggestionRow[];
+    'SELECT * FROM suggestions WHERE call_id = ? AND user_id = ? ORDER BY created_at ASC, id ASC',
+  ).all(callId, userId) as LoadedSuggestionRow[];
   return { utterances, suggestions };
 }
 
-// Daily spend uses the materialized total_cost_usd column written at finalize time.
-export function getDailySpendUsd(): number {
+// ── per-user spend ─────────────────────────────────────────────────────────
+
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Returns today's accumulated spend for a single user. */
+export function getDailySpendUsd(userId: string): number {
+  const row = db.query(
+    'SELECT COALESCE(total_cost_usd, 0) AS total FROM user_quotas WHERE user_id = ? AND date = ?',
+  ).get(userId, todayUtc()) as { total: number } | null;
+  return row?.total ?? 0;
+}
+
+/** UPSERT: bump per-user spend + call count for today. */
+export function incrementUserSpend(userId: string, costUsd: number, callIncrement = 0): void {
+  db.run(
+    `INSERT INTO user_quotas (user_id, date, total_cost_usd, call_count)
+       VALUES (?, ?, ?, ?)
+     ON CONFLICT (user_id, date) DO UPDATE SET
+       total_cost_usd = total_cost_usd + excluded.total_cost_usd,
+       call_count = call_count + excluded.call_count`,
+    [userId, todayUtc(), costUsd, callIncrement],
+  );
+}
+
+/**
+ * Global daily-spend ceiling — sums today's spend across ALL users.
+ * Demo route still uses this for the $20/day global cap.
+ */
+export function getGlobalDailySpendUsd(): number {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const cutoff = startOfDay.getTime();
-
   const row = db.query(
     'SELECT COALESCE(SUM(total_cost_usd), 0) AS total FROM calls WHERE started_at >= ?',
   ).get(cutoff) as { total: number } | null;
@@ -242,10 +285,8 @@ export function getDailySpendUsd(): number {
 }
 
 // ── legacy demo IP rate-limit shim ─────────────────────────────────────────
-// The desktop app doesn't need IP rate limiting — the Bun sidecar binds to
-// 127.0.0.1 only. The web demo (apps/web with practice mode) still wants a
-// global ceiling, so this is a memory-only fallback when ip_sessions has
-// been dropped.
+// The web demo (apps/web with practice mode) still wants a global IP cap.
+// In-memory because the desktop app no longer cares about IP rate limits.
 
 const memoryIpSessions = new Map<string, number>();
 
@@ -255,4 +296,20 @@ export function checkAndIncrementIpSession(ip: string, dailyCap: number): boolea
   const next = (memoryIpSessions.get(key) ?? 0) + 1;
   memoryIpSessions.set(key, next);
   return next <= dailyCap;
+}
+
+// ── test reset ─────────────────────────────────────────────────────────────
+
+/** Test-only: drop tables and re-run migrations. */
+export function _resetDbForTests(): void {
+  db.exec(`
+    DROP TABLE IF EXISTS calls;
+    DROP TABLE IF EXISTS utterances;
+    DROP TABLE IF EXISTS suggestions;
+    DROP TABLE IF EXISTS participants;
+    DROP TABLE IF EXISTS user_quotas;
+    DROP TABLE IF EXISTS schema_version;
+  `);
+  memoryIpSessions.clear();
+  runMigrations(db);
 }

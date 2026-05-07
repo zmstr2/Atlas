@@ -3,8 +3,8 @@ import { Database } from 'bun:sqlite';
 /**
  * Tiny migration runner for the local SQLite store. Not Postgres-grade — there
  * is no migration ledger; each migration is idempotent and self-checks via
- * PRAGMA before running. Sufficient for a single-user local DB that the
- * desktop app upgrades in place across versions.
+ * PRAGMA before running. Sufficient for a single-instance Railway deployment
+ * AND for the legacy desktop in-process DB.
  */
 export type Migration = {
   name: string;
@@ -92,17 +92,14 @@ const migrations: Migration[] = [
   {
     name: '002_drop_ip_sessions',
     run(db) {
-      // Demo IP rate-limit table is irrelevant for the local desktop app.
-      // Kept idempotent so this migration is safe to re-run.
+      // Demo IP rate-limit table is now in-memory only.
       db.exec(`DROP TABLE IF EXISTS ip_sessions;`);
     },
   },
   {
     name: '003_add_call_columns_for_local',
     run(db) {
-      // Backward-compatibility for installs that came from the demo schema:
-      // the legacy demo schema had script NOT NULL and was missing several
-      // desktop-mode columns. Add them in place.
+      // Backward-compatibility for installs that came from the demo schema.
       if (!tableHasColumn(db, 'calls', 'follow_up_email')) {
         db.exec(`ALTER TABLE calls ADD COLUMN follow_up_email TEXT`);
       }
@@ -124,9 +121,7 @@ const migrations: Migration[] = [
       if (!tableHasColumn(db, 'calls', 'status')) {
         db.exec(`ALTER TABLE calls ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`);
       }
-      // Backfill: copy legacy training_delta into coaching_artifact once,
-      // then null the old column. Don't drop it — SQLite ALTER TABLE DROP
-      // COLUMN is finicky on older versions.
+      // Backfill: copy legacy training_delta into coaching_artifact once.
       if (tableHasColumn(db, 'calls', 'training_delta')) {
         db.exec(
           `UPDATE calls SET coaching_artifact = training_delta
@@ -143,6 +138,45 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    name: '005_add_user_id_scoping',
+    run(db) {
+      // user_id scoping for multi-tenant Railway deployment. Default '__demo__'
+      // keeps existing rows accessible via the demo flow (which uses
+      // DEMO_USER_ID = '__demo__' as its sentinel).
+      if (!tableHasColumn(db, 'calls', 'user_id')) {
+        db.exec(`ALTER TABLE calls ADD COLUMN user_id TEXT NOT NULL DEFAULT '__demo__'`);
+      }
+      if (!tableHasColumn(db, 'utterances', 'user_id')) {
+        db.exec(`ALTER TABLE utterances ADD COLUMN user_id TEXT NOT NULL DEFAULT '__demo__'`);
+      }
+      if (!tableHasColumn(db, 'suggestions', 'user_id')) {
+        db.exec(`ALTER TABLE suggestions ADD COLUMN user_id TEXT NOT NULL DEFAULT '__demo__'`);
+      }
+      // Defensive backfill in case older rows landed with NULL.
+      db.exec(`UPDATE calls       SET user_id = '__demo__' WHERE user_id IS NULL OR user_id = ''`);
+      db.exec(`UPDATE utterances  SET user_id = '__demo__' WHERE user_id IS NULL OR user_id = ''`);
+      db.exec(`UPDATE suggestions SET user_id = '__demo__' WHERE user_id IS NULL OR user_id = ''`);
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_calls_user ON calls(user_id, started_at DESC)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_utterances_user ON utterances(user_id, created_at)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_suggestions_user ON suggestions(user_id, created_at)`);
+    },
+  },
+  {
+    name: '006_create_user_quotas',
+    run(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user_quotas (
+          user_id TEXT NOT NULL,
+          date TEXT NOT NULL,
+          total_cost_usd REAL NOT NULL DEFAULT 0,
+          call_count INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (user_id, date)
+        );
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database): void {
@@ -155,3 +189,6 @@ export function runMigrations(db: Database): void {
     }
   }
 }
+
+// Re-exported for tests
+export { tableExists, tableHasColumn };
