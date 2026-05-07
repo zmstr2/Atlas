@@ -12,6 +12,7 @@ import { saveMemorySnapshot, recordUtterance, recordSuggestion } from '../db/sql
 
 export type PipelineSession = {
   callId: string;
+  userId: string;
   brief: PreCallBrief;
   store: MemoryStore;
   hotTail: HotTail;
@@ -27,12 +28,13 @@ export type PipelineSession = {
 const RECENT_SUGGESTIONS_WINDOW = 6;
 const SUGGESTER_MODE = (process.env.SUGGESTER_MODE ?? 'merged') as 'split' | 'merged';
 
-export function createPipelineSession(callId: string, brief: PreCallBrief): PipelineSession {
+export function createPipelineSession(callId: string, userId: string, brief: PreCallBrief): PipelineSession {
   const store = new MemoryStore();
   const hotTail = new HotTail(5);
 
   const session: PipelineSession = {
     callId,
+    userId,
     brief,
     store,
     hotTail,
@@ -104,13 +106,13 @@ function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, spe
 }
 
 export async function processUtterance(session: PipelineSession, utterance: Utterance) {
-  const { callId, brief, store, hotTail, transcript } = session;
+  const { callId, userId, brief, store, hotTail, transcript } = session;
 
   // Synchronous bookkeeping
   transcript.push(utterance);
   hotTail.push(utterance);
   store.recordUtteranceStats(utterance.speaker, utterance.text);
-  recordUtterance(callId, utterance);
+  recordUtterance(callId, userId, utterance);
   broadcastEvent(callId, { type: 'utterance', utterance });
   broadcastEvent(callId, { type: 'pulse', utteranceId: utterance.id });
 
@@ -153,13 +155,13 @@ export async function processUtterance(session: PipelineSession, utterance: Utte
       session.lastSuggestionTurn = session.turnCounter;
       session.lastSuggestionAgent = suggestion.agent;
       pushRecent(session, suggestion, true, utterance.speaker);
-      recordSuggestion(callId, utterance.id, session.turnCounter, suggestion, false);
+      recordSuggestion(callId, userId, utterance.id, session.turnCounter, suggestion, false);
     } else if (suggestion.shouldFire) {
       // Record what the model wanted to fire even when gated, so we can audit
       // suppression decisions offline. Also feed the recent-suggestions window so
       // the merged agent can see what it almost-fired.
       pushRecent(session, suggestion, false, utterance.speaker);
-      recordSuggestion(callId, utterance.id, session.turnCounter, suggestion, true);
+      recordSuggestion(callId, userId, utterance.id, session.turnCounter, suggestion, true);
     } else {
       // Model chose silence. Push to the in-memory window (not the DB) so the
       // cadence rule "3 of last 5 fired" measures last-5-TURNS, not
