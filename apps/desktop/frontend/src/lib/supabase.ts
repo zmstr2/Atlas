@@ -51,6 +51,38 @@ async function getTauriStore() {
   return tauriStorePromise;
 }
 
+// Storage failure pub/sub. The Tauri keychain plugin can fail (OS upgrade,
+// permission denied, plugin not loaded) and the previous behavior was to
+// silently fall back to in-memory — symptom for the user was "I sign in
+// every launch and don't know why." We still fail open (refusing to sign in
+// would be worse UX) but emit an event so a banner can render in the UI.
+type StorageErrorListener = (err: Error) => void;
+const storageErrorListeners = new Set<StorageErrorListener>();
+let storageHasFailed = false;
+
+export function onStorageError(cb: StorageErrorListener): () => void {
+  storageErrorListeners.add(cb);
+  // Fire immediately if we've already seen a failure — components mounting
+  // late shouldn't miss earlier errors.
+  if (storageHasFailed) {
+    cb(new Error('Atlas auth storage previously failed'));
+  }
+  return () => storageErrorListeners.delete(cb);
+}
+
+function reportStorageError(label: string, err: unknown): void {
+  storageHasFailed = true;
+  const wrapped = err instanceof Error ? err : new Error(String(err));
+  console.warn(`[supabase] ${label} failed`, wrapped);
+  for (const cb of storageErrorListeners) {
+    try {
+      cb(wrapped);
+    } catch (cbErr) {
+      console.error('[supabase] onStorageError listener threw', cbErr);
+    }
+  }
+}
+
 // Supabase 2.x's `SupportedStorage` interface allows async returns. We adapt
 // either Tauri's plugin-store or window.localStorage to the same shape.
 const tauriStorage: SupportedStorage = {
@@ -60,7 +92,7 @@ const tauriStorage: SupportedStorage = {
       const value = await store.get(key);
       return typeof value === 'string' ? value : null;
     } catch (err) {
-      console.warn('[supabase] tauri store getItem failed', err);
+      reportStorageError('tauri store getItem', err);
       return null;
     }
   },
@@ -70,7 +102,7 @@ const tauriStorage: SupportedStorage = {
       await store.set(key, value);
       await store.save();
     } catch (err) {
-      console.warn('[supabase] tauri store setItem failed', err);
+      reportStorageError('tauri store setItem', err);
     }
   },
   async removeItem(key: string): Promise<void> {
@@ -79,7 +111,7 @@ const tauriStorage: SupportedStorage = {
       await store.delete(key);
       await store.save();
     } catch (err) {
-      console.warn('[supabase] tauri store removeItem failed', err);
+      reportStorageError('tauri store removeItem', err);
     }
   },
 };
@@ -181,7 +213,11 @@ async function pushTokenToTauri(token: string): Promise<void> {
     const { invoke } = await import('@tauri-apps/api/core');
     await invoke('set_atlas_auth_token', { token });
   } catch (err) {
-    console.warn('[supabase] failed to push token to Tauri bridge', err);
+    // If the Rust core can't accept the token, every subsequent atlas_bridge
+    // POST will use a stale or absent token and hit 401. The frontend has no
+    // way to detect that desync from a successful auth-state change. Surface
+    // through the same channel as storage failures so UI can warn the user.
+    reportStorageError('failed to push token to Tauri bridge', err);
   }
 }
 
@@ -191,7 +227,7 @@ async function clearTokenInTauri(): Promise<void> {
     const { invoke } = await import('@tauri-apps/api/core');
     await invoke('clear_atlas_auth_token');
   } catch (err) {
-    console.warn('[supabase] failed to clear Tauri auth token', err);
+    reportStorageError('failed to clear Tauri auth token', err);
   }
 }
 

@@ -5,6 +5,8 @@
 //
 // Every request carries the Supabase JWT in `Authorization: Bearer <token>`.
 // On 401 we sign the user out (which kicks them back to /login via AuthGate).
+// On 503 with code=jwks_unreachable we throw AuthBackendUnreachableError so
+// callers can show a transient banner instead of forcing a sign-out.
 
 import type {
   PreCallBrief,
@@ -66,13 +68,15 @@ async function http<T>(
         if (!error && data.session?.access_token) {
           return http<T>(method, path, body, true);
         }
-      } catch {
-        // fall through to signOut
+      } catch (err) {
+        console.warn('[agent] refreshSession threw before retry', err);
       }
     }
     // Refresh failed (or this was already the retry) — clear session so
     // AuthGate redirects to /login.
-    await signOut().catch(() => {});
+    await signOut().catch((e) =>
+      console.error('[agent] signOut failed during 401 recovery', e),
+    );
     throw new UnauthorizedError(`agent ${method} ${path} → 401`);
   }
   if (res.status === 503) {
@@ -116,6 +120,9 @@ export type CallDetail = {
     verdict: Verdict | null;
     coaching_artifact: unknown | null;
     follow_up_email: string | null;
+    verdict_status: string | null;
+    coaching_status: string | null;
+    followup_status: string | null;
   };
   participants: Array<{ participantId: string; displayName: string | null; role: SpeakerRole }>;
   utterances: Array<{
@@ -175,14 +182,17 @@ export async function relabelParticipant(
 // SSE stream — subscribe to live pipeline events.
 //
 // EventSource doesn't support custom headers in browsers/webviews, so we pass
-// the JWT as a `?token=…` query param. Lane A's auth middleware needs to
-// recognize the token query param for this route specifically.
+// the JWT as a `?token=…` query param. The auth middleware accepts the query
+// param ONLY for /calls/:id/stream paths (regex-scoped).
 //
-// Refresh strategy: EventSource has no clean retry primitive, so on the first
-// error we close the stream, force a Supabase refreshSession(), and reopen
-// with the new token. If the second attempt also errors, we sign out. The
-// returned object is a wrapper so callers can call `.close()` even after a
-// reconnect under the hood; we don't try to expose the inner EventSource.
+// Recovery strategy: EventSource has no way to read HTTP status, so on a
+// hard close we probe /calls/:id over HTTP to disambiguate cases. The probe
+// uses the same http() helper above, which already maps:
+//   401 → UnauthorizedError (after one refresh+retry)
+//   503 jwks_unreachable → AuthBackendUnreachableError
+// We reopen on transient failures and signOut only on real auth failure.
+//
+// Backoff for jwks_unreachable: 5s → 30s → 2min, capped at 2min.
 export async function streamCall(
   callId: string,
   onEvent: (event: SSEEventLike) => void,
@@ -193,10 +203,14 @@ export async function streamCall(
   }
 
   let current: EventSource | null = null;
-  let attemptedRefresh = false;
   let closedByUser = false;
+  let jwksRetryDelayMs = 5_000;
+  let jwksRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  // Listener registrations made via the proxy. Replayed on every reopen so
+  // listeners survive the EventSource swap.
+  const listeners = new Set<{ type: string; handler: EventListener }>();
 
-  const open = (jwt: string) => {
+  const open = (jwt: string): EventSource => {
     const url = `${AGENT_BASE}/calls/${callId}/stream?token=${encodeURIComponent(jwt)}`;
     const es = new EventSource(url);
     es.onmessage = (e) => {
@@ -206,46 +220,96 @@ export async function streamCall(
         console.warn('[agent] failed to parse SSE event', err);
       }
     };
-    es.onerror = async () => {
+    // Replay any previously-registered listeners onto the new EventSource.
+    for (const { type, handler } of listeners) {
+      es.addEventListener(type, handler);
+    }
+    es.onerror = () => {
       if (closedByUser) return;
-      // EventSource fires `onerror` on transient disconnects too — but if we
-      // were going to recover via the browser's built-in reconnect, the
-      // `readyState` would be CONNECTING (0). When it's CLOSED (2), it's a
-      // hard failure (likely 401 auth) and we step in.
+      // EventSource fires `onerror` on transient disconnects too — but if
+      // the browser were going to recover via its built-in reconnect, the
+      // `readyState` would still be CONNECTING (0). When it's CLOSED (2),
+      // the browser has given up and we step in.
       if (es.readyState !== EventSource.CLOSED) return;
-      if (attemptedRefresh) {
-        console.warn('[agent] SSE failed after refresh; signing out');
-        await signOut().catch(() => {});
-        return;
-      }
-      attemptedRefresh = true;
-      try {
-        const { data, error } = await supabase.auth.refreshSession();
-        if (error || !data.session?.access_token) {
-          await signOut().catch(() => {});
-          return;
-        }
-        current = open(data.session.access_token);
-      } catch (err) {
-        console.warn('[agent] SSE refresh-and-reopen failed', err);
-        await signOut().catch(() => {});
-      }
+      void recover();
     };
     return es;
+  };
+
+  const recover = async () => {
+    if (closedByUser) return;
+    // Probe HTTP to learn what kind of failure we're recovering from. The
+    // http() helper does the refresh+retry on 401 internally, so by the
+    // time it throws UnauthorizedError there's nothing more we can do.
+    try {
+      await getCall(callId);
+      // Probe succeeded — connection lost was a transient network blip,
+      // not auth. Reset jwks backoff and reopen.
+      jwksRetryDelayMs = 5_000;
+      const fresh = await getAccessToken();
+      if (fresh) current = open(fresh);
+      return;
+    } catch (err) {
+      if (err instanceof AuthBackendUnreachableError) {
+        // JWKS down. Don't sign out. Tell the UI, schedule retry.
+        onEvent({
+          type: 'error',
+          code: 'auth_unreachable',
+          message: 'Atlas auth backend reconnecting',
+        });
+        if (jwksRetryTimer) clearTimeout(jwksRetryTimer);
+        jwksRetryTimer = setTimeout(() => {
+          void recover();
+        }, jwksRetryDelayMs);
+        // Backoff: 5s → 30s → 2min, capped.
+        jwksRetryDelayMs = Math.min(jwksRetryDelayMs * 6, 120_000);
+        return;
+      }
+      if (err instanceof UnauthorizedError) {
+        // Real auth failure (refresh already attempted by http()).
+        await signOut().catch((e) =>
+          console.error('[agent] signOut failed during SSE recovery', e),
+        );
+        return;
+      }
+      // Other errors — could be network down, agent down. Reopen with the
+      // same token; EventSource's own reconnect loop will keep trying.
+      console.warn('[agent] SSE probe failed unexpectedly, reopening', err);
+      const fresh = await getAccessToken();
+      if (fresh) current = open(fresh);
+    }
   };
 
   current = open(token);
 
   // Return a proxy EventSource-like object so the caller's existing
   // `.close()` keeps working even after we've swapped the inner instance.
-  // We can't actually subclass EventSource, so we hand back the live one
-  // and shim `close` via a Proxy-ish pattern.
+  // addEventListener/removeEventListener are tracked in the `listeners` set
+  // and replayed on every reopen.
   const proxy = new Proxy({} as EventSource, {
     get(_target, prop) {
       if (prop === 'close') {
         return () => {
           closedByUser = true;
+          if (jwksRetryTimer) clearTimeout(jwksRetryTimer);
           current?.close();
+        };
+      }
+      if (prop === 'addEventListener') {
+        return (type: string, handler: EventListener) => {
+          listeners.add({ type, handler });
+          current?.addEventListener(type, handler);
+        };
+      }
+      if (prop === 'removeEventListener') {
+        return (type: string, handler: EventListener) => {
+          // Remove all entries that match this (type, handler) pair.
+          for (const entry of listeners) {
+            if (entry.type === type && entry.handler === handler) {
+              listeners.delete(entry);
+            }
+          }
+          current?.removeEventListener(type, handler);
         };
       }
       // @ts-expect-error — passthrough to whichever instance is current
