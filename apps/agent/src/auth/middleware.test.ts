@@ -202,3 +202,29 @@ describe('getUserId helper', () => {
     expect(await res.text()).toBe('threw');
   });
 });
+
+describe('JWKS unreachable → 503 jwks_unreachable (not 401)', () => {
+  test('network error from JWKS resolver returns 503 jwks_unreachable', async () => {
+    // Override the JWKS resolver with one that throws a network-style error.
+    __setJWKSForTesting(async () => {
+      throw new TypeError('fetch failed: ENOTFOUND test.supabase.co');
+    });
+
+    const token = await signToken();
+    const app = buildApp();
+    const res = await app.request('/protected/whoami', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    // Restore the working resolver for downstream tests.
+    __setJWKSForTesting(async () => publicKey);
+
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.code).toBe('jwks_unreachable');
+    // Critically NOT 401 — clients MUST distinguish "your JWT is bad" from
+    // "we can't currently verify" so they don't force a sign-out for a
+    // valid session during a transient backend outage.
+    expect(res.status).not.toBe(401);
+  });
+});

@@ -17,7 +17,11 @@ type UnauthorizedCode =
   | 'invalid_issuer'
   | 'invalid_audience'
   | 'invalid_token'
-  | 'server_misconfigured';
+  | 'server_misconfigured'
+  // JWKS endpoint network/HTTP failure. Distinct from invalid_signature so the
+  // desktop client can show "Atlas auth backend is temporarily unreachable —
+  // try again in a minute" instead of forcing a sign-out for a working JWT.
+  | 'jwks_unreachable';
 
 /**
  * Test-only hook: replace the JWKS resolver. When set, requireAuth uses this
@@ -131,6 +135,25 @@ export function requireAuth(): MiddlewareHandler {
       }
       if (err instanceof joseErrors.JWSInvalid || err instanceof joseErrors.JWTInvalid) {
         return unauthorized(c, 'malformed');
+      }
+      // jose's createRemoteJWKSet throws JWKSNoMatchingKey / JWKSMultipleMatchingKeys
+      // for key resolution problems, JWKSInvalid for malformed JWKS responses,
+      // and surfaces network errors as plain Error from the underlying fetch.
+      // All of these mean "we can't currently verify" rather than "this token is
+      // bad" — separate code so the client doesn't force-sign-out the user.
+      if (
+        err instanceof joseErrors.JWKSNoMatchingKey ||
+        err instanceof joseErrors.JWKSMultipleMatchingKeys ||
+        err instanceof joseErrors.JWKSInvalid ||
+        err instanceof joseErrors.JWKSTimeout
+      ) {
+        console.error('[auth] JWKS resolution failed:', err);
+        return c.json({ error: 'unauthorized', code: 'jwks_unreachable' }, 503);
+      }
+      // Network errors from the underlying fetch — TypeError, AbortError, etc.
+      if (err instanceof TypeError || (err instanceof Error && /fetch|network|enotfound|econnrefused/i.test(err.message))) {
+        console.error('[auth] JWKS fetch failed:', err);
+        return c.json({ error: 'unauthorized', code: 'jwks_unreachable' }, 503);
       }
       return unauthorized(c, 'invalid_token');
     }

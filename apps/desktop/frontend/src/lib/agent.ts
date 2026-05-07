@@ -26,6 +26,18 @@ export class UnauthorizedError extends Error {
   }
 }
 
+/**
+ * Thrown when the agent reports the auth backend (Supabase JWKS) is
+ * unreachable. Distinct from UnauthorizedError because this isn't the user's
+ * fault — they should NOT be signed out, they should retry.
+ */
+export class AuthBackendUnreachableError extends Error {
+  constructor(message = 'Atlas auth backend temporarily unavailable') {
+    super(message);
+    this.name = 'AuthBackendUnreachableError';
+  }
+}
+
 async function http<T>(
   method: 'GET' | 'POST' | 'PATCH',
   path: string,
@@ -62,6 +74,16 @@ async function http<T>(
     // AuthGate redirects to /login.
     await signOut().catch(() => {});
     throw new UnauthorizedError(`agent ${method} ${path} → 401`);
+  }
+  if (res.status === 503) {
+    // Could be jwks_unreachable from the auth middleware — that one is NOT
+    // the user's fault, don't sign out. Surface as a separate error so call
+    // sites can show a "try again in a minute" banner.
+    const body503 = await res.clone().json().catch(() => ({}));
+    if (body503?.code === 'jwks_unreachable') {
+      throw new AuthBackendUnreachableError();
+    }
+    // Other 503s fall through to the generic non-ok path below.
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
