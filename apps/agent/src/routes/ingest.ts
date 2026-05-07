@@ -40,6 +40,7 @@ import {
   removeSession,
 } from './pipeline';
 import { SpeakerMap } from '../transcription/speakerMap';
+import { runPostCallChain } from './postCall';
 
 /**
  * Local ingestion endpoint for the desktop app. The Tauri Rust core POSTs
@@ -191,21 +192,26 @@ ingestRoutes.patch('/:callId/participants/:participantId', async (c) => {
 
 ingestRoutes.post('/:callId/end', async (c) => {
   const callId = c.req.param('callId');
+  const userId = getUserIdLoose(c);
   const session = getSession(callId);
   if (!session) {
     return c.json({ error: 'unknown_call', callId }, 404);
   }
 
-  finalizeCall(callId, getUserIdLoose(c));
+  finalizeCall(callId, userId);
   broadcastEvent(callId, { type: 'call_end', callId });
-  removeSession(callId);
-  speakerMaps.delete(callId);
 
-  // TODO(post-call agents): trigger verdict + coaching artifact + follow-up
-  // generation here. For now they remain wired through the existing demo
-  // flow; the desktop UI calls GET /calls/:id afterward to read them once
-  // they've been written. Hooking the post-call chain to ingest is part of
-  // Step 7 in the plan.
+  // Fire-and-forget post-call chain. The frontend redirects to the coaching
+  // view immediately; verdict / coaching / follow-up artifacts stream in via
+  // SSE as each agent finishes. Session + speaker map are cleaned up only
+  // after the chain finishes — the chain reads memory/transcript off the
+  // session.
+  void runPostCallChain({ callId, userId, session, brief: session.brief })
+    .catch((err) => console.error('[ingest] post-call chain failed', callId, err))
+    .finally(() => {
+      removeSession(callId);
+      speakerMaps.delete(callId);
+    });
 
   return c.json({ ok: true });
 });
@@ -252,8 +258,9 @@ ingestRoutes.get('/:callId/stream', (c) => {
   });
 });
 
-// Suppress unused-import warnings until post-call chain is wired in.
+// `updateCallStatus` is exported for future use (failed-call recovery), keep
+// the import alive for now.
+void updateCallStatus;
 void saveVerdict;
 void saveCoachingArtifact;
 void saveFollowUpEmail;
-void updateCallStatus;

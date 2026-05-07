@@ -258,6 +258,19 @@ export function getDailySpendUsd(userId: string): number {
   return row?.total ?? 0;
 }
 
+/**
+ * Bump the running cost for a single call. Used by the LLM wrapper to
+ * attribute every completion to the call that triggered it. Errors are
+ * swallowed because cost-tracking must never break the hot path.
+ */
+export function incrementCallCost(callId: string, costUsd: number): void {
+  try {
+    db.run('UPDATE calls SET total_cost_usd = COALESCE(total_cost_usd, 0) + ? WHERE id = ?', [costUsd, callId]);
+  } catch (err) {
+    console.error('[sqlite] incrementCallCost failed', callId, err);
+  }
+}
+
 /** UPSERT: bump per-user spend + call count for today. */
 export function incrementUserSpend(userId: string, costUsd: number, callIncrement = 0): void {
   db.run(
