@@ -5,13 +5,11 @@ import type { MeetingMemory, Utterance, Suggestion, SpeakerRole, PreCallBrief } 
 import { runMigrations } from './migrations';
 
 // Resolve DB path. Precedence:
-//   1. SQLITE_PATH (legacy override, used by tests + demo)
-//   2. ATLAS_DATA_DIR/atlas.db (set by the Tauri shell at sidecar spawn time —
-//      points at the OS-standard app data dir on each platform). With Lane D's
-//      remote-agent pivot, this is mostly historical: Railway sets its own
-//      working dir.
-//   3. ./atlas.db (dev default when running `bun run dev:agent` from the
-//      monorepo root)
+//   1. SQLITE_PATH (full path override, used by tests and the web demo)
+//   2. ATLAS_DATA_DIR/atlas.db — production path. On Railway this points at a
+//      mounted persistent volume (/data). Without ATLAS_DATA_DIR the container
+//      filesystem is ephemeral and every redeploy wipes user data.
+//   3. ./atlas.db (dev default when running `bun run dev:agent` locally)
 function resolveDbPath(): string {
   if (process.env.SQLITE_PATH) return process.env.SQLITE_PATH;
   if (process.env.ATLAS_DATA_DIR) {
@@ -210,14 +208,46 @@ export type LoadedCallRow = {
   verdict: string | null;
   coaching_artifact: string | null;
   follow_up_email: string | null;
+  verdict_status: string | null;
+  coaching_status: string | null;
+  followup_status: string | null;
 };
 
 export function loadCall(callId: string, userId: string): LoadedCallRow | null {
   return db.query(
     `SELECT id, user_id, script, prospect_name, meeting_url, brief_json, status,
-            started_at, ended_at, verdict, coaching_artifact, follow_up_email
+            started_at, ended_at, verdict, coaching_artifact, follow_up_email,
+            verdict_status, coaching_status, followup_status
      FROM calls WHERE id = ? AND user_id = ?`,
   ).get(callId, userId) as LoadedCallRow | null;
+}
+
+/**
+ * Persist the result of one post-call agent step on the call row. `status`
+ * is either 'ok' or 'failed:<truncated message>'. Step is type-restricted so
+ * the column name is never user-controlled (no SQL-injection surface).
+ */
+export type PostCallStep = 'verdict' | 'coaching' | 'followup';
+const POST_CALL_STATUS_COLUMNS: Record<PostCallStep, string> = {
+  verdict: 'verdict_status',
+  coaching: 'coaching_status',
+  followup: 'followup_status',
+};
+
+export function setPostCallStatus(
+  callId: string,
+  step: PostCallStep,
+  status: string,
+): void {
+  const column = POST_CALL_STATUS_COLUMNS[step];
+  // Cap message length so we don't blow out the row on a multi-MB stack
+  // trace (jose / node fetch can produce huge errors).
+  const truncated = status.length > 500 ? status.slice(0, 500) : status;
+  try {
+    db.run(`UPDATE calls SET ${column} = ? WHERE id = ?`, [truncated, callId]);
+  } catch (err) {
+    console.error('[sqlite] setPostCallStatus failed', callId, step, err);
+  }
 }
 
 export function listCalls(userId: string, limit = 100): Array<Pick<LoadedCallRow,
@@ -258,29 +288,60 @@ export function getDailySpendUsd(userId: string): number {
   return row?.total ?? 0;
 }
 
+// ── cost-attribution health ───────────────────────────────────────────────
+// We swallow cost-tracking errors so a SQLite hiccup can't break the LLM
+// hot path — but a *silent* swallow means a stuck DB lets users blow past
+// daily spend caps indefinitely. Track a counter the /health endpoint
+// surfaces so an oncall alert can fire when this drifts.
+
+let costAttributionFailures = 0;
+
+export function getCostAttributionFailureCount(): number {
+  return costAttributionFailures;
+}
+
+/** Test-only reset for the failure counter. */
+export function _resetCostAttributionFailureCount(): void {
+  costAttributionFailures = 0;
+}
+
+function recordCostAttributionFailure(label: string, err: unknown): void {
+  costAttributionFailures += 1;
+  console.error(`[sqlite] ${label} failed (cumulative=${costAttributionFailures})`, err);
+}
+
 /**
  * Bump the running cost for a single call. Used by the LLM wrapper to
  * attribute every completion to the call that triggered it. Errors are
- * swallowed because cost-tracking must never break the hot path.
+ * swallowed (DB cost-tracking must never break the hot path) but counted —
+ * see getCostAttributionFailureCount.
  */
 export function incrementCallCost(callId: string, costUsd: number): void {
   try {
     db.run('UPDATE calls SET total_cost_usd = COALESCE(total_cost_usd, 0) + ? WHERE id = ?', [costUsd, callId]);
   } catch (err) {
-    console.error('[sqlite] incrementCallCost failed', callId, err);
+    recordCostAttributionFailure('incrementCallCost', err);
   }
 }
 
-/** UPSERT: bump per-user spend + call count for today. */
+/**
+ * UPSERT: bump per-user spend + call count for today. Errors swallowed for
+ * the same reason as incrementCallCost — but with a counter, so a stuck DB
+ * doesn't silently disable the daily spend cap.
+ */
 export function incrementUserSpend(userId: string, costUsd: number, callIncrement = 0): void {
-  db.run(
-    `INSERT INTO user_quotas (user_id, date, total_cost_usd, call_count)
-       VALUES (?, ?, ?, ?)
-     ON CONFLICT (user_id, date) DO UPDATE SET
-       total_cost_usd = total_cost_usd + excluded.total_cost_usd,
-       call_count = call_count + excluded.call_count`,
-    [userId, todayUtc(), costUsd, callIncrement],
-  );
+  try {
+    db.run(
+      `INSERT INTO user_quotas (user_id, date, total_cost_usd, call_count)
+         VALUES (?, ?, ?, ?)
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         total_cost_usd = total_cost_usd + excluded.total_cost_usd,
+         call_count = call_count + excluded.call_count`,
+      [userId, todayUtc(), costUsd, callIncrement],
+    );
+  } catch (err) {
+    recordCostAttributionFailure('incrementUserSpend', err);
+  }
 }
 
 /**

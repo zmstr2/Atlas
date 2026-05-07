@@ -18,19 +18,9 @@ import {
   saveVerdict,
   updateCallStatus,
   upsertParticipant,
-  DEMO_USER_ID,
 } from '../db/sqlite';
+import { getUserId } from '../auth/middleware';
 import type { Context } from 'hono';
-
-/**
- * Pull the authenticated userId off the Hono context. Lane A's auth middleware
- * sets `c.set('userId', payload.sub)` for /calls/* requests. Falls back to
- * DEMO_USER_ID if (a) middleware wasn't applied (dev) or (b) the test bench
- * runs these handlers directly without an auth wrapper.
- */
-function getUserIdLoose(c: Context): string {
-  return (c.get('userId') as string | undefined) ?? DEMO_USER_ID;
-}
 import { createSSEStream, broadcastEvent } from '../sse/handler';
 import {
   createPipelineSession,
@@ -38,17 +28,19 @@ import {
   processUtterance,
   registerSession,
   removeSession,
+  type PipelineSession,
 } from './pipeline';
 import { SpeakerMap } from '../transcription/speakerMap';
 import { runPostCallChain } from './postCall';
 
 /**
- * Local ingestion endpoint for the desktop app. The Tauri Rust core POSTs
- * each finalized utterance from its on-device transcription pipeline to
- * /calls/:callId/utterance; the Atlas pipeline runs in this same Bun
- * sidecar process and emits SSE back to the Next.js frontend.
+ * Multi-tenant ingestion endpoint for the Atlas desktop app. Mounted under
+ * /calls/*, so requireAuth has already verified a Supabase JWT and set
+ * userId on the Hono context before any handler here runs.
  *
- * No auth — sidecar binds to 127.0.0.1 only and is spawned by Tauri.
+ * The Tauri Rust core POSTs finalized utterances over HTTPS to the Railway
+ * agent (this process). Pipeline events flow back to the Next.js webview
+ * via the SSE stream on /calls/:id/stream.
  */
 export const ingestRoutes = new Hono();
 
@@ -68,6 +60,37 @@ function getOrInitSpeakerMap(callId: string): SpeakerMap {
   return m;
 }
 
+/**
+ * Verify the authenticated user owns this call. Returns either a success
+ * record (with the live PipelineSession if one exists, or null after a
+ * cross-process restart) or a 404 Response that the handler must `return`.
+ *
+ * Why 404 (not 403): a 403 leaks the existence of someone else's callId,
+ * which is useful to an attacker enumerating ids. 404 is indistinguishable
+ * from a typo.
+ */
+function assertCallOwner(
+  c: Context,
+  callId: string,
+): { session: PipelineSession | null; userId: string } | Response {
+  const userId = getUserId(c);
+  const session = getSession(callId);
+  if (session) {
+    if (session.userId !== userId) {
+      return c.json({ error: 'unknown_call', callId }, 404);
+    }
+    return { session, userId };
+  }
+  // No live session — could be (a) wrong/typoed callId, (b) post-restart with
+  // the DB row intact. loadCall is already userId-scoped so a cross-tenant
+  // attempt returns null here.
+  const row = loadCall(callId, userId);
+  if (!row) {
+    return c.json({ error: 'unknown_call', callId }, 404);
+  }
+  return { session: null, userId };
+}
+
 // ── POST /calls — start a new call ──────────────────────────────────────────
 
 const StartCallBodySchema = z.object({
@@ -82,7 +105,7 @@ ingestRoutes.post('/', async (c) => {
     return c.json({ error: 'invalid_brief', detail: parsed.error.flatten() }, 400);
   }
 
-  const userId = getUserIdLoose(c);
+  const userId = getUserId(c);
   const callId = nanoid();
   const brief = parsed.data.brief;
   const prospectName = brief.prospect?.name ?? brief.lead?.name ?? null;
@@ -123,9 +146,14 @@ ingestRoutes.post('/:callId/utterance', async (c) => {
     return c.json({ error: 'invalid_utterance', detail: parsed.error.flatten() }, 400);
   }
 
-  const session = getSession(callId);
+  const ownership = assertCallOwner(c, callId);
+  if (ownership instanceof Response) return ownership;
+  const { session } = ownership;
   if (!session) {
-    return c.json({ error: 'unknown_call', callId }, 404);
+    // Call exists in DB but has no live session (agent restarted mid-call).
+    // We don't try to rehydrate transcripts/memory here — surface a 409 so
+    // the desktop client can recover (end the call cleanly, restart fresh).
+    return c.json({ error: 'session_not_active', callId }, 409);
   }
 
   const speakerMap = getOrInitSpeakerMap(callId);
@@ -153,10 +181,17 @@ ingestRoutes.post('/:callId/utterance', async (c) => {
     derivedFromLowConfidence: false,
   };
 
-  // Fire and forget — the pipeline emits SSE downstream.
-  void processUtterance(session, utterance).catch((err) =>
-    console.error('[ingest] processUtterance failed', err),
-  );
+  // Fire and forget — the pipeline emits SSE downstream. On failure we both
+  // log AND surface an SSE error so the desktop UI can show "agents failed
+  // for this turn" instead of silently missing coaching.
+  void processUtterance(session, utterance).catch((err) => {
+    console.error('[ingest] processUtterance failed', callId, err);
+    broadcastEvent(callId, {
+      type: 'error',
+      code: 'pipeline_failure',
+      message: err instanceof Error ? err.message : String(err),
+    });
+  });
 
   return c.json({ utteranceId: utterance.id, role });
 });
@@ -177,6 +212,9 @@ ingestRoutes.patch('/:callId/participants/:participantId', async (c) => {
     return c.json({ error: 'invalid_body', detail: parsed.error.flatten() }, 400);
   }
 
+  const ownership = assertCallOwner(c, callId);
+  if (ownership instanceof Response) return ownership;
+
   getOrInitSpeakerMap(callId).setRole(participantId, parsed.data.role);
   upsertParticipant({
     callId,
@@ -192,10 +230,16 @@ ingestRoutes.patch('/:callId/participants/:participantId', async (c) => {
 
 ingestRoutes.post('/:callId/end', async (c) => {
   const callId = c.req.param('callId');
-  const userId = getUserIdLoose(c);
-  const session = getSession(callId);
+  const ownership = assertCallOwner(c, callId);
+  if (ownership instanceof Response) return ownership;
+  const { session, userId } = ownership;
   if (!session) {
-    return c.json({ error: 'unknown_call', callId }, 404);
+    // Call row exists but session was lost on agent restart. Mark the row
+    // ended so the user can see it in their list, but we have no in-memory
+    // memory/transcript to feed the post-call chain.
+    finalizeCall(callId, userId);
+    broadcastEvent(callId, { type: 'call_end', callId });
+    return c.json({ ok: true, postCall: 'skipped_no_session' });
   }
 
   finalizeCall(callId, userId);
@@ -207,7 +251,15 @@ ingestRoutes.post('/:callId/end', async (c) => {
   // after the chain finishes — the chain reads memory/transcript off the
   // session.
   void runPostCallChain({ callId, userId, session, brief: session.brief })
-    .catch((err) => console.error('[ingest] post-call chain failed', callId, err))
+    .catch((err) => {
+      console.error('[ingest] post-call chain failed', callId, err);
+      broadcastEvent(callId, {
+        type: 'post_call_failed',
+        callId,
+        step: 'chain',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    })
     .finally(() => {
       removeSession(callId);
       speakerMaps.delete(callId);
@@ -219,12 +271,12 @@ ingestRoutes.post('/:callId/end', async (c) => {
 // ── reads ──────────────────────────────────────────────────────────────────
 
 ingestRoutes.get('/', (c) => {
-  return c.json({ calls: listCalls(getUserIdLoose(c), 200) });
+  return c.json({ calls: listCalls(getUserId(c), 200) });
 });
 
 ingestRoutes.get('/:callId', (c) => {
   const callId = c.req.param('callId');
-  const userId = getUserIdLoose(c);
+  const userId = getUserId(c);
   const call = loadCall(callId, userId);
   if (!call) return c.json({ error: 'unknown_call', callId }, 404);
 
@@ -244,9 +296,14 @@ ingestRoutes.get('/:callId', (c) => {
   });
 });
 
-// SSE stream — same protocol as the demo.
+// SSE stream — same protocol as the demo. Ownership-checked: a user can only
+// subscribe to their own calls. Without this check any logged-in user could
+// subscribe to any callId and exfiltrate live transcript + suggestions.
 ingestRoutes.get('/:callId/stream', (c) => {
   const callId = c.req.param('callId');
+  const ownership = assertCallOwner(c, callId);
+  if (ownership instanceof Response) return ownership;
+
   const stream = createSSEStream(callId);
   return new Response(stream, {
     headers: {

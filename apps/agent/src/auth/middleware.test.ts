@@ -63,11 +63,17 @@ function buildApp() {
     const email = c.get('userEmail');
     return c.json({ userId, email });
   });
-  app.get('/protected/calls/:id/stream', (c) => {
+  // Mount the SSE-style routes at the production path shape so the
+  // regex-scoped `?token=` fallback (which only matches /calls/:id/stream)
+  // applies. Previously these were under /protected/calls/:id/stream which
+  // matched the old endsWith('/stream') predicate but would silently NOT
+  // exercise the new tighter regex.
+  app.use('/calls/*', requireAuth());
+  app.get('/calls/:id/stream', (c) => {
     const userId = getUserId(c);
     return c.json({ userId, streamed: true });
   });
-  app.get('/protected/calls/:id', (c) => {
+  app.get('/calls/:id', (c) => {
     const userId = getUserId(c);
     return c.json({ userId });
   });
@@ -140,7 +146,7 @@ describe('SSE token query-param fallback', () => {
 
   test('valid ?token= on /stream path → userId attached', async () => {
     const token = await signToken();
-    const res = await app.request(`/protected/calls/foo/stream?token=${token}`);
+    const res = await app.request(`/calls/foo/stream?token=${token}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.userId).toBe(TEST_USER_ID);
@@ -149,26 +155,26 @@ describe('SSE token query-param fallback', () => {
 
   test('expired ?token= on /stream path → 401 expired', async () => {
     const token = await signToken({ expSecondsFromNow: -60 });
-    const res = await app.request(`/protected/calls/foo/stream?token=${token}`);
+    const res = await app.request(`/calls/foo/stream?token=${token}`);
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'unauthorized', code: 'expired' });
   });
 
   test('?token= on non-/stream path → 401 missing_token (not accepted)', async () => {
     const token = await signToken();
-    const res = await app.request(`/protected/calls/foo?token=${token}`);
+    const res = await app.request(`/calls/foo?token=${token}`);
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'unauthorized', code: 'missing_token' });
   });
 
   test('/stream path without any token → 401 missing_token', async () => {
-    const res = await app.request('/protected/calls/foo/stream');
+    const res = await app.request('/calls/foo/stream');
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'unauthorized', code: 'missing_token' });
   });
 
   test('malformed ?token= on /stream path → 401 malformed', async () => {
-    const res = await app.request('/protected/calls/foo/stream?token=not-a-jwt');
+    const res = await app.request('/calls/foo/stream?token=not-a-jwt');
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'unauthorized', code: 'malformed' });
   });
@@ -177,7 +183,7 @@ describe('SSE token query-param fallback', () => {
     const headerToken = await signToken({ sub: 'header-user' });
     const queryToken = await signToken({ sub: 'query-user' });
     const res = await app.request(
-      `/protected/calls/foo/stream?token=${queryToken}`,
+      `/calls/foo/stream?token=${queryToken}`,
       { headers: { authorization: `Bearer ${headerToken}` } },
     );
     expect(res.status).toBe(200);

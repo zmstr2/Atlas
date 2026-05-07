@@ -81,9 +81,12 @@ function extractToken(c: Context): {
     return { token, via: 'header' };
   }
 
-  // Query-param fallback ONLY for SSE endpoints (path ending in `/stream`).
+  // Query-param fallback ONLY for the call SSE endpoint. Path is regex-scoped
+  // so future routes ending in `/stream` don't auto-inherit the JWT-in-URL
+  // leakage surface — adding a new SSE endpoint should be a deliberate
+  // decision, not the default.
   const url = new URL(c.req.url);
-  if (url.pathname.endsWith('/stream')) {
+  if (/^\/calls\/[^/]+\/stream$/.test(url.pathname)) {
     const tokenParam = url.searchParams.get('token');
     if (tokenParam) return { token: tokenParam, via: 'query' };
   }
