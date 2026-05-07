@@ -1,32 +1,36 @@
-// atlas_bridge — wires Meetily's transcript pipeline into the Atlas Bun sidecar.
+// atlas_bridge — forwards Meetily's transcript pipeline to the remote Atlas
+// agent (deployed on Railway). Previously this also spawned a bundled Bun
+// sidecar; that has been removed in favor of a remote HTTPS service.
 //
-// Two pieces:
-//   1. spawn_sidecar: launches the bundled atlas-agent binary on app startup
-//      with ATLAS_DATA_DIR set to Tauri's app_data_dir so SQLite lands in the
-//      OS-standard per-user dir.
-//   2. install_event_forwarder: subscribes to Meetily's "transcript-update"
+// Responsibilities:
+//   1. install_event_forwarder: subscribes to Meetily's "transcript-update"
 //      Tauri event, drops partials, and POSTs final utterances to
-//      http://127.0.0.1:3001/calls/{callId}/utterance.
+//      `${ATLAS_AGENT_URL}/calls/{callId}/utterance` with the user's JWT in
+//      the Authorization header.
+//   2. Tauri commands for the frontend to set/clear the active call and the
+//      auth token, and to read the agent base URL.
 //
-// The active Atlas call id lives in a parking_lot mutex shared with the
-// `set_active_atlas_call` and `clear_active_atlas_call` Tauri commands, which
-// the frontend invokes around the call lifecycle. While there's no active
-// call, transcript events are dropped silently.
+// The active Atlas call id and auth token live in mutexes shared with the
+// Tauri commands. While there's no active call OR no auth token, transcript
+// events are dropped silently (with a warning log on missing auth).
 
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Listener, Manager};
-use tauri_plugin_shell::process::{CommandChild, CommandEvent};
-use tauri_plugin_shell::ShellExt;
 
-const SIDECAR_NAME: &str = "atlas-agent";
-const SIDECAR_PORT: u16 = 3001;
-const SIDECAR_BASE: &str = "http://127.0.0.1:3001";
+const DEFAULT_AGENT_URL: &str = "https://atlas-agent.up.railway.app";
+
+/// Resolve the Atlas agent base URL. Reads `ATLAS_AGENT_URL` from the
+/// environment at runtime (set at compile time by the build / Tauri config,
+/// or at dev runtime). Falls back to the production Railway URL.
+fn agent_base_url() -> String {
+    std::env::var("ATLAS_AGENT_URL").unwrap_or_else(|_| DEFAULT_AGENT_URL.to_string())
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct AtlasState {
     pub active_call_id: Arc<Mutex<Option<String>>>,
-    pub sidecar_handle: Arc<Mutex<Option<CommandChild>>>,
+    pub auth_token: Arc<Mutex<Option<String>>>,
 }
 
 impl AtlasState {
@@ -64,7 +68,7 @@ struct UtteranceBody {
 }
 
 /// Map Meetily's audio source label to a stable participant id and an
-/// initial founder/customer hint. The Atlas sidecar's SpeakerMap will
+/// initial founder/customer hint. The Atlas agent's SpeakerMap will
 /// override these labels if the user relabels mid-call.
 fn participant_for_source(source: &str) -> (&'static str, &'static str) {
     let s = source.to_ascii_lowercase();
@@ -75,63 +79,12 @@ fn participant_for_source(source: &str) -> (&'static str, &'static str) {
     }
 }
 
-/// Spawn the bundled atlas-agent sidecar. Returns the child handle so we
-/// can kill it on app shutdown.
-pub fn spawn_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("resolve app_data_dir: {e}"))?
-        .join("atlas-agent");
-    std::fs::create_dir_all(&data_dir)
-        .map_err(|e| format!("create atlas-agent data dir: {e}"))?;
-
-    log::info!(
-        "[atlas_bridge] spawning {SIDECAR_NAME} sidecar (data_dir={:?})",
-        data_dir
-    );
-
-    let (mut rx, child) = app
-        .shell()
-        .sidecar(SIDECAR_NAME)
-        .map_err(|e| format!("locate sidecar binary: {e}"))?
-        .env("ATLAS_DATA_DIR", data_dir.to_string_lossy().to_string())
-        .env("PORT", SIDECAR_PORT.to_string())
-        .spawn()
-        .map_err(|e| format!("spawn sidecar: {e}"))?;
-
-    // Forward sidecar stdout/stderr into Tauri's logs for diagnosability.
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            match event {
-                CommandEvent::Stdout(line) => {
-                    log::info!(
-                        "[atlas-agent stdout] {}",
-                        String::from_utf8_lossy(&line).trim_end()
-                    );
-                }
-                CommandEvent::Stderr(line) => {
-                    log::warn!(
-                        "[atlas-agent stderr] {}",
-                        String::from_utf8_lossy(&line).trim_end()
-                    );
-                }
-                CommandEvent::Terminated(status) => {
-                    log::error!("[atlas-agent] terminated: {:?}", status);
-                    break;
-                }
-                _ => {}
-            }
-        }
-    });
-
-    Ok(child)
-}
-
 /// Subscribe to Meetily's "transcript-update" events and forward finalized
-/// utterances to the Atlas sidecar.
+/// utterances to the remote Atlas agent.
 pub fn install_event_forwarder(app: &AppHandle) {
-    let active_call = app.state::<AtlasState>().active_call_id.clone();
+    let state = app.state::<AtlasState>();
+    let active_call = state.active_call_id.clone();
+    let auth_token = state.auth_token.clone();
     let app_handle = app.clone();
 
     app.listen("transcript-update", move |event| {
@@ -156,6 +109,16 @@ pub fn install_event_forwarder(app: &AppHandle) {
             None => return, // no active Atlas call — ignore
         };
 
+        let token = match auth_token.lock().ok().and_then(|g| g.clone()) {
+            Some(t) => t,
+            None => {
+                log::warn!(
+                    "[atlas_bridge] no auth token set; skipping utterance POST (user not logged in?)"
+                );
+                return;
+            }
+        };
+
         let (participant_id, speaker) = participant_for_source(&update.source);
         let body = UtteranceBody {
             participant_id: participant_id.to_string(),
@@ -170,11 +133,11 @@ pub fn install_event_forwarder(app: &AppHandle) {
             speaker: speaker.to_string(),
         };
 
-        let url = format!("{SIDECAR_BASE}/calls/{call_id}/utterance");
+        let url = format!("{}/calls/{call_id}/utterance", agent_base_url());
         let app_for_emit = app_handle.clone();
         tauri::async_runtime::spawn(async move {
             let client = match reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(5))
+                .timeout(std::time::Duration::from_secs(10))
                 .build()
             {
                 Ok(c) => c,
@@ -184,7 +147,13 @@ pub fn install_event_forwarder(app: &AppHandle) {
                 }
             };
 
-            match client.post(&url).json(&body).send().await {
+            match client
+                .post(&url)
+                .bearer_auth(&token)
+                .json(&body)
+                .send()
+                .await
+            {
                 Ok(res) if res.status().is_success() => {
                     // Success — nothing to do. Pipeline broadcasts SSE
                     // back to the frontend independently.
@@ -193,22 +162,25 @@ pub fn install_event_forwarder(app: &AppHandle) {
                     let status = res.status();
                     let body_text = res.text().await.unwrap_or_default();
                     log::warn!(
-                        "[atlas_bridge] sidecar rejected utterance: {status} {body_text}"
+                        "[atlas_bridge] agent rejected utterance: {status} {body_text}"
                     );
                     let _ = app_for_emit.emit(
                         "atlas-bridge-error",
-                        format!("sidecar {status}: {body_text}"),
+                        format!("agent {status}: {body_text}"),
                     );
                 }
                 Err(e) => {
-                    log::warn!("[atlas_bridge] sidecar POST failed: {e}");
+                    log::warn!("[atlas_bridge] agent POST failed: {e}");
                     let _ = app_for_emit.emit("atlas-bridge-error", e.to_string());
                 }
             }
         });
     });
 
-    log::info!("[atlas_bridge] event forwarder installed");
+    log::info!(
+        "[atlas_bridge] event forwarder installed (agent={})",
+        agent_base_url()
+    );
 }
 
 // ── Tauri commands invoked from the Atlas frontend ─────────────────────────
@@ -230,6 +202,22 @@ pub fn clear_active_atlas_call(state: tauri::State<'_, AtlasState>) {
 }
 
 #[tauri::command]
-pub fn atlas_sidecar_base_url() -> String {
-    SIDECAR_BASE.to_string()
+pub fn atlas_agent_base_url() -> String {
+    agent_base_url()
+}
+
+#[tauri::command]
+pub fn set_atlas_auth_token(state: tauri::State<'_, AtlasState>, token: String) {
+    log::info!("[atlas_bridge] auth token set ({} chars)", token.len());
+    if let Ok(mut guard) = state.auth_token.lock() {
+        *guard = Some(token);
+    }
+}
+
+#[tauri::command]
+pub fn clear_atlas_auth_token(state: tauri::State<'_, AtlasState>) {
+    log::info!("[atlas_bridge] auth token cleared");
+    if let Ok(mut guard) = state.auth_token.lock() {
+        *guard = None;
+    }
 }

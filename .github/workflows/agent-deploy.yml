@@ -1,0 +1,18 @@
+name: Deploy Atlas Agent
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/agent/**'
+      - 'packages/types/**'
+      - '.github/workflows/agent-deploy.yml'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: railwayapp/cli@v3
+        with:
+          command: up --service atlas-agent --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

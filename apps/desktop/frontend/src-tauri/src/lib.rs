@@ -397,7 +397,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_shell::init())
         .manage(atlas_bridge::AtlasState::new())
         .manage(whisper_engine::parallel_commands::ParallelProcessorState::new())
         .manage(Arc::new(RwLock::new(
@@ -408,18 +407,9 @@ pub fn run() {
         .setup(|_app| {
             log::info!("Application setup complete");
 
-            // Atlas: spawn the bundled atlas-agent sidecar and start
-            // forwarding finalized transcripts to it.
-            match atlas_bridge::spawn_sidecar(&_app.handle()) {
-                Ok(child) => {
-                    if let Some(state) = _app.try_state::<atlas_bridge::AtlasState>() {
-                        if let Ok(mut guard) = state.sidecar_handle.lock() {
-                            *guard = Some(child);
-                        }
-                    }
-                }
-                Err(e) => log::error!("Failed to spawn atlas-agent sidecar: {}", e),
-            }
+            // Atlas: forward finalized transcripts to the remote Atlas agent
+            // (deployed on Railway). The bundled Bun sidecar has been removed;
+            // see atlas_bridge.rs and ATLAS_AGENT_URL env.
             atlas_bridge::install_event_forwarder(&_app.handle());
 
             // Initialize system tray
@@ -522,7 +512,9 @@ pub fn run() {
             save_transcript,
             atlas_bridge::set_active_atlas_call,
             atlas_bridge::clear_active_atlas_call,
-            atlas_bridge::atlas_sidecar_base_url,
+            atlas_bridge::atlas_agent_base_url,
+            atlas_bridge::set_atlas_auth_token,
+            atlas_bridge::clear_atlas_auth_token,
             analytics::commands::init_analytics,
             analytics::commands::disable_analytics,
             analytics::commands::track_event,
