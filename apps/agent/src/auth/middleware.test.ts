@@ -63,6 +63,14 @@ function buildApp() {
     const email = c.get('userEmail');
     return c.json({ userId, email });
   });
+  app.get('/protected/calls/:id/stream', (c) => {
+    const userId = getUserId(c);
+    return c.json({ userId, streamed: true });
+  });
+  app.get('/protected/calls/:id', (c) => {
+    const userId = getUserId(c);
+    return c.json({ userId });
+  });
   return app;
 }
 
@@ -121,6 +129,60 @@ describe('requireAuth middleware', () => {
     });
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'unauthorized', code: 'invalid_issuer' });
+  });
+});
+
+describe('SSE token query-param fallback', () => {
+  let app: ReturnType<typeof buildApp>;
+  beforeEach(() => {
+    app = buildApp();
+  });
+
+  test('valid ?token= on /stream path → userId attached', async () => {
+    const token = await signToken();
+    const res = await app.request(`/protected/calls/foo/stream?token=${token}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.userId).toBe(TEST_USER_ID);
+    expect(body.streamed).toBe(true);
+  });
+
+  test('expired ?token= on /stream path → 401 expired', async () => {
+    const token = await signToken({ expSecondsFromNow: -60 });
+    const res = await app.request(`/protected/calls/foo/stream?token=${token}`);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'unauthorized', code: 'expired' });
+  });
+
+  test('?token= on non-/stream path → 401 missing_token (not accepted)', async () => {
+    const token = await signToken();
+    const res = await app.request(`/protected/calls/foo?token=${token}`);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'unauthorized', code: 'missing_token' });
+  });
+
+  test('/stream path without any token → 401 missing_token', async () => {
+    const res = await app.request('/protected/calls/foo/stream');
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'unauthorized', code: 'missing_token' });
+  });
+
+  test('malformed ?token= on /stream path → 401 malformed', async () => {
+    const res = await app.request('/protected/calls/foo/stream?token=not-a-jwt');
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'unauthorized', code: 'malformed' });
+  });
+
+  test('header takes precedence when both header and query token present', async () => {
+    const headerToken = await signToken({ sub: 'header-user' });
+    const queryToken = await signToken({ sub: 'query-user' });
+    const res = await app.request(
+      `/protected/calls/foo/stream?token=${queryToken}`,
+      { headers: { authorization: `Bearer ${headerToken}` } },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.userId).toBe('header-user');
   });
 });
 

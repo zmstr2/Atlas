@@ -47,6 +47,45 @@ function unauthorized(c: Context, code: UnauthorizedCode) {
   return c.json({ error: 'unauthorized', code }, 401);
 }
 
+// SECURITY: We extract the JWT from the Authorization header by default. The
+// browser EventSource API used for SSE cannot send custom headers, so for
+// SSE endpoints (path ending in `/stream`) we ALSO accept the JWT via a
+// `?token=<jwt>` query parameter as a narrowly-scoped fallback.
+//
+// Query params are accepted ONLY for SSE because:
+//   - URLs (incl. query strings) leak into HTTP access logs, browser history,
+//     Referer headers, and crash reports.
+//   - The Authorization header does not have these leakage paths.
+// Allowing `?token=` for arbitrary routes would broaden the leakage surface
+// across the whole API. SSE is the one place where the platform constraint
+// (no custom headers from EventSource) forces us to accept the tradeoff.
+//
+// If the Authorization header is present but malformed, we return that
+// without falling through to the query param — a malformed header is an
+// active client bug, not a missing credential.
+function extractToken(c: Context): {
+  token: string | null;
+  via: 'header' | 'query' | null;
+  reason?: 'malformed' | 'missing_token';
+} {
+  const authHeader = c.req.header('authorization') ?? c.req.header('Authorization');
+  if (authHeader) {
+    const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
+    if (!match) return { token: null, via: null, reason: 'malformed' };
+    const token = match[1].trim();
+    if (!token) return { token: null, via: null, reason: 'missing_token' };
+    return { token, via: 'header' };
+  }
+
+  // Query-param fallback ONLY for SSE endpoints (path ending in `/stream`).
+  const url = new URL(c.req.url);
+  if (url.pathname.endsWith('/stream')) {
+    const tokenParam = url.searchParams.get('token');
+    if (tokenParam) return { token: tokenParam, via: 'query' };
+  }
+  return { token: null, via: null, reason: 'missing_token' };
+}
+
 /**
  * Hono middleware that verifies a Supabase JWT from the Authorization header.
  *
@@ -62,13 +101,11 @@ export function requireAuth(): MiddlewareHandler {
       return unauthorized(c, 'server_misconfigured');
     }
 
-    const authHeader = c.req.header('authorization') ?? c.req.header('Authorization');
-    if (!authHeader) return unauthorized(c, 'missing_token');
-
-    const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
-    if (!match) return unauthorized(c, 'malformed');
-    const token = match[1].trim();
-    if (!token) return unauthorized(c, 'missing_token');
+    const extracted = extractToken(c);
+    if (!extracted.token) {
+      return unauthorized(c, extracted.reason ?? 'missing_token');
+    }
+    const token = extracted.token;
 
     // Quick structural check: JWT has 3 dot-separated parts.
     if (token.split('.').length !== 3) return unauthorized(c, 'malformed');
