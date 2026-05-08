@@ -34,7 +34,7 @@ export type RealtimeClient = {
   hangup: () => void;
 };
 
-const REALTIME_URL = 'https://api.openai.com/v1/realtime';
+const REALTIME_URL = 'https://api.openai.com/v1/realtime/calls';
 
 /**
  * Connect the browser directly to OpenAI Realtime via WebRTC.
@@ -95,7 +95,7 @@ export async function connectRealtime(opts: {
   const offer = await peer.createOffer();
   await peer.setLocalDescription(offer);
 
-  const sdpResponse = await fetch(`${REALTIME_URL}?model=${encodeURIComponent(session.model)}`, {
+  const sdpResponse = await fetch(REALTIME_URL, {
     method: 'POST',
     body: offer.sdp,
     headers: {
@@ -220,7 +220,7 @@ function routeEvent(
   // the audio for this turn is still streaming/playing. The suggester pipeline
   // gates on isFinal, so flushing here would fire suggestions before the rep
   // has heard the prospect finish.
-  if (type === 'response.audio_transcript.done') {
+  if (type === 'response.output_audio_transcript.done' || type === 'response.audio_transcript.done') {
     const responseId = String(payload.response_id ?? payload.item_id ?? `p-${Date.now()}`);
     const itemId = String(payload.item_id ?? payload.response_id ?? `p-${Date.now()}`);
     pendingPersonaFinal.set(responseId, { text: String(payload.transcript ?? ''), itemId });
@@ -230,7 +230,11 @@ function routeEvent(
   // Audio for this assistant turn has finished streaming from the server.
   // This also fires on cancellation (barge-in), so the buffered transcript
   // still flushes — possibly truncated, which is the correct behavior.
-  if (type === 'output_audio_buffer.stopped' || type === 'response.done') {
+  if (
+    type === 'response.output_audio.done' ||
+    type === 'output_audio_buffer.stopped' ||
+    type === 'response.done'
+  ) {
     const responseId = String(
       payload.response_id ??
       (payload.response as { id?: string } | undefined)?.id ??
@@ -258,7 +262,7 @@ function routeEvent(
 
   // Inbound persona transcript (delta) — we ignore for the coach pipeline (final only),
   // but a future version could stream partial UI hints.
-  if (type === 'response.audio_transcript.delta') {
+  if (type === 'response.output_audio_transcript.delta' || type === 'response.audio_transcript.delta') {
     events.transcript?.({
       type: 'transcript',
       speaker: 'persona',
