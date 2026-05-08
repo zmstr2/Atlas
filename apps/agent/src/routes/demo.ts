@@ -9,7 +9,7 @@ import { ReplayTimer } from '../replay/timer';
 import type { PreCallBrief, Utterance } from '@atlas/types';
 import { broadcastEvent } from '../sse/handler';
 
-const SCRIPTS = ['jordan', 'sarah', 'tom'] as const;
+const SCRIPTS = ['jordan', 'sarah', 'tom', 'mia'] as const;
 type Script = typeof SCRIPTS[number];
 
 const IP_DAILY_CAP = 20;

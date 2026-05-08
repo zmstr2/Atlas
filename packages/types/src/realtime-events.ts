@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const PersonaIdSchema = z.enum(['jordan']);
+export const PersonaIdSchema = z.enum(['jordan', 'mia']);
 export type PersonaId = z.infer<typeof PersonaIdSchema>;
 
 export const TranscriptSpeakerSchema = z.enum(['rep', 'persona']);

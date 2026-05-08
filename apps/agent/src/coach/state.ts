@@ -8,9 +8,11 @@ import { getPersona } from '../realtime/personas';
 import { clearPipelineChain } from './pipelineChain';
 import { createCall, recordUtterance, recordSuggestion, finalizeCall, loadCall, loadCallLog } from '../db/sqlite';
 import jordanBrief from '../../../../fixtures/jordan-brief.json' with { type: 'json' };
+import miaBrief from '../../../../fixtures/mia-brief.json' with { type: 'json' };
 
 const BRIEFS: Record<PersonaId, PreCallBrief> = {
   jordan: jordanBrief as PreCallBrief,
+  mia: miaBrief as PreCallBrief,
 };
 
 export type SuggestionRecord = {

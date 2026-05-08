@@ -28,7 +28,7 @@ const DAY_SHORT: Record<DayKey, string> = {
 type CalendarEvent = {
   time: string;
   title: string;
-  isJordan?: boolean;
+  isDemoCall?: boolean;
 };
 
 const EVENTS: Record<DayKey, CalendarEvent[]> = {
@@ -49,7 +49,7 @@ const EVENTS: Record<DayKey, CalendarEvent[]> = {
   ],
   thu: [
     { time: '9:00', title: 'Standup' },
-    { time: '2:00', title: 'Discovery — Jordan Hayes', isJordan: true },
+    { time: '2:00', title: 'YC W26 — Mia Chen (Drift Labs)', isDemoCall: true },
     { time: '4:00', title: 'Forecast prep' },
   ],
   fri: [
@@ -91,17 +91,17 @@ export default function VoiceLandingPage() {
 
   const startCall = () => {
     const callId = `call_${nanoid(10)}`;
-    posthog.capture('call_started', { call_id: callId, persona_id: 'jordan' });
-    setActive({ callId, personaId: 'jordan' });
+    posthog.capture('call_started', { call_id: callId, persona_id: 'mia' });
+    setActive({ callId, personaId: 'mia' });
   };
 
-  // Jordan lives on whatever day is "today" so the demo always feels current.
+  // The demo call lives on whatever day is "today" so the demo always feels current.
   const eventsByDay: Record<DayKey, CalendarEvent[]> = { ...EVENTS };
   if (todayKey !== 'thu') {
-    eventsByDay.thu = EVENTS.thu.map(e => (e.isJordan ? { ...e, isJordan: false } : e));
+    eventsByDay.thu = EVENTS.thu.map(e => (e.isDemoCall ? { ...e, isDemoCall: false } : e));
     eventsByDay[todayKey] = [
       ...EVENTS[todayKey],
-      { time: '2:00', title: 'Discovery — Jordan Hayes', isJordan: true },
+      { time: '2:00', title: 'YC W26 — Mia Chen (Drift Labs)', isDemoCall: true },
     ].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
   }
 
@@ -122,7 +122,7 @@ export default function VoiceLandingPage() {
               Hey Jaspar, here&apos;s your {DAY_NAMES[todayKey]}.
             </h1>
             <p className="text-fg-secondary text-lg mt-2">
-              You&apos;ve got a discovery call with Jordan Hayes at 2:00 — Atlas will be on the line.
+              You&apos;ve got a W26 conversation with Mia Chen (Drift Labs) at 2:00 — Atlas will be on the line.
             </p>
           </div>
         </header>
@@ -158,7 +158,7 @@ export default function VoiceLandingPage() {
                           key={i}
                           event={ev}
                           isPast={isPast}
-                          onClick={ev.isJordan ? startCall : undefined}
+                          onClick={ev.isDemoCall ? startCall : undefined}
                         />
                       ))}
                     </div>
@@ -184,7 +184,7 @@ function EventTile({
   isPast: boolean;
   onClick?: () => void;
 }) {
-  if (event.isJordan) {
+  if (event.isDemoCall) {
     return (
       <div className="rounded-md px-2 py-2 bg-accent text-white shadow-lg shadow-accent/25 ring-1 ring-accent/40">
         <div className="flex items-center gap-1.5">

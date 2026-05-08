@@ -11,6 +11,8 @@ import {
 const INTRO_BY_PERSONA: Record<PersonaId, string> = {
   jordan:
     "I'm watching this call live and will surface suggestions when something interesting comes up — objections, decision-maker hints, budget signals.\n\nJordan is your champion, but Marcus Liu (VP RevOps, ex-Gong, joined 3 months ago) is the economic buyer above ~$120k. Priya Shah (demand gen manager) owns Salesloft workflows and has de facto veto on tooling changes there — get her name on the demo invite.\n\nBest opener: lead with the LinkedIn post he wrote about scaling outbound without headcount. That's what got him on the call. Do not pitch AI features generically — he's already skeptical of what HubSpot is shipping.",
+  mia:
+    "I'm watching this call live and will surface suggestions when something interesting comes up — dilution math, cofounder dynamics, alternative-VC framing.\n\nMia is the technical cofounder of Drift Labs — $40K MRR, 50 paying users, ex-Stripe. She has an active offer from Bedrock for $1.5M at $10M post. The real decision is dilution math AND her cofounder Sam, who is design-led and skeptical of accelerators. Mia won't move without Sam.\n\nBest opener: reference her eval-framework thread (it's how the email landed). Don't pitch the YC brand generically — she's at a stage where 'the network is incredible' isn't a real answer. Move toward concrete W25 stage-comparable outcomes and a way to bring Sam in directly.",
 };
 import {
   createCoachState,

@@ -1,0 +1,62 @@
+{
+  "lead": {
+    "name": "Mia Chen",
+    "title": "Cofounder & CTO",
+    "company": "Drift Labs",
+    "companySize": "2 cofounders, pre-seed"
+  },
+  "avaContext": {
+    "campaignId": "yc-w26-outreach",
+    "leadScore": 0.78,
+    "scoringSignals": [
+      { "signal": "Ex-Stripe (Payments Infra, 3 years)", "weight": 0.30 },
+      { "signal": "Working product with $40K MRR + 50 paying users", "weight": 0.25 },
+      { "signal": "AI dev tools — strong YC vertical fit", "weight": 0.20 },
+      { "signal": "Cofounder pair (technical + design)", "weight": 0.15 },
+      { "signal": "Posted thoughtful thread on agent eval frameworks", "weight": 0.10 }
+    ]
+  },
+  "pastInteractions": [
+    {
+      "type": "email",
+      "date": "2026-04-30",
+      "summary": "Cold outreach: 'Saw your eval framework thread — Drift Labs looks like a strong W26 fit. Worth a 20-minute conversation?' Mia replied within an hour."
+    }
+  ],
+  "callGoal": "convince Mia (and through her, cofounder Sam) to apply to YC W26 before the deadline closes",
+  "suggestedQuestions": [
+    "What's the gap between where Drift Labs is now and where you want it to be 12 months from now — and what's the rate-limiter?",
+    "How are you and Sam thinking about fundraising? Are you running a process, or waiting for inbound?",
+    "What would have to be true for YC to be the obvious move?"
+  ],
+  "productSnippets": [
+    "YC writes a $500K SAFE for ~7% on standard terms. Decision in days, not months. No board seat.",
+    "The W25 batch had 41% of companies raise a priced seed within 6 months of Demo Day at a median post-money of $20M.",
+    "Office hours with partners weekly during the batch. Founder network of 5,000+ active companies. Lifetime access to alumni Slack, deals, and events."
+  ],
+  "icp": {
+    "dealShape": "$500K SAFE for ~7% equity on standard terms (no negotiation, no board seat). Founder gives up dilution; gets capital + brand + network + 3 months of structured momentum.",
+    "cycleLength": "Very short. From first conversation to interview to decision is typically 1-3 weeks. Decision lands within days of the interview.",
+    "buyerPersona": "Pre-seed/seed startup founder. Often technical; usually 22-35; commonly with 1 cofounder. Strong-willed by selection — they decided to start a company. Heavily peer-influenced (other founders' opinions matter more than vendor pitches). Has limited time and is allergic to anything that smells like a generic pitch.",
+    "decisionMakerCount": "1-2 cofounders. Both must be aligned — a skeptical cofounder is the #1 reason a strong applicant doesn't apply. Multi-thread early.",
+    "competitiveLandscape": "Other accelerators (Techstars, Antler, On Deck), seed VCs going direct (a16z, USV, Sequoia Arc), angels-only routes, or going alone. Each has different psychological pull: VCs feel 'more serious,' going-alone feels 'more independent,' other accelerators feel 'less prestigious but lower dilution.'",
+    "valueFrame": "Founders aren't buying capital — capital is widely available. They're buying: (1) credibility/brand stamp, (2) forced focus + tempo for 3 months, (3) the alumni network, (4) Demo Day as a fundraising forcing function. Frame value in those terms, not in dollar terms.",
+    "buyingSignals": [
+      "Names a specific YC alumni founder/company they admire (Stripe, Brex, Notion, Airbnb, Cruise) — this is engagement with the brand promise",
+      "Asks about post-Demo-Day resources, alumni Slack, partner office hours after the batch",
+      "References a specific batch (W26, S26) by name — they've been thinking about timing",
+      "Names cofounder by name AND with role/concern (e.g., 'Sam is the design lead and he's skeptical of accelerators') — multi-thread signal",
+      "Asks 'what % of last batch raised at $X+ post' — they're modeling outcomes",
+      "Mentions specific competitors they're already in conversation with (a16z, named seed VC, named accelerator) — they're shopping",
+      "Asks about how to structure existing investor relationships through YC — they're solving practical problems, which means they're already mentally past 'should we'"
+    ],
+    "objectionRoots": [
+      "'7% is too much dilution' surfaces as price; root is usually stage-mismatch (founder feels they have leverage to take a larger check at lower dilution from a seed VC). Don't argue dilution math — reframe to brand/network/tempo value or to what their current option-set actually looks like at their stage.",
+      "'We don't need help / we want to stay independent' surfaces as need; root is usually fear-of-conformity or skepticism that the program adds value at their specific stage. Don't argue 'help is good' — name a peer at their stage who said the same thing and what they got.",
+      "'We're already raising / we already have a lead' surfaces as competition or timing; root is usually that they don't yet see how YC is additive (vs alternative). Don't 'fight' the lead — show how YC compresses and elevates the round they're already running.",
+      "'My cofounder is skeptical' surfaces as authority; root is usually that the cofounder isn't bought into the value frame above. Suggest direct conversation with the cofounder, or an alum intro from a similar pair.",
+      "'We're past the right stage for YC' surfaces as need; root is usually that they're using a generic mental model of YC (pre-revenue, idea-stage). Counter with specific data on revenue-stage W25 alums."
+    ],
+    "goodNextStep": "Either (a) a 30-minute call with the cofounder included to address skepticism directly, OR (b) a warm intro to a YC alum at a comparable stage that the founder would actually take, OR (c) a hard commitment to submit the application by a specific date before the batch deadline. 'We'll think about it' is a loss signal. 'Send me more info' is a loss signal unless paired with a calendared follow-up."
+  }
+}
