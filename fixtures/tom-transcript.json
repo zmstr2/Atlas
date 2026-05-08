@@ -1,7 +1,7 @@
 [
   {
     "id": "u1",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Hey Tom, good to connect. I'm Alex from Artisan. I saw your post about SDR efficiency last week — seemed like the right time to reach out.",
     "startMs": 0,
     "endMs": 10000,
@@ -17,7 +17,7 @@
   },
   {
     "id": "u3",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "So Ava is an AI BDR that handles the full outbound sequence — prospecting, personalized email generation, follow-ups — so your SDRs are only jumping in when there's a warm signal. What does the admin breakdown look like for your team right now?",
     "startMs": 31000,
     "endMs": 54000,
@@ -33,7 +33,7 @@
   },
   {
     "id": "u5",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That's a really common pattern with Salesforce-heavy stacks. Ava writes all activity data back automatically — call logs, email engagement, stage updates — so your CRM data is clean without reps touching it. Does that solve the core problem?",
     "startMs": 93000,
     "endMs": 117000,
@@ -49,7 +49,7 @@
   },
   {
     "id": "u7",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "For a team your size — eight SDRs — you're typically in the thirty to fifty thousand per year range depending on seat count and features. Does that fit within what you're working with?",
     "startMs": 136000,
     "endMs": 155000,
@@ -65,7 +65,7 @@
   },
   {
     "id": "u9",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That's totally fine — and it's actually better to have Sarah involved early so we're not doing a demo twice. Would she be open to a follow-up call? I can bring our head of CS to walk through the Salesforce integration in detail.",
     "startMs": 199000,
     "endMs": 222000,
@@ -81,7 +81,7 @@
   },
   {
     "id": "u11",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That works. Why don't I send you a one-pager you can forward to Sarah — covers the Salesforce sync, pricing range, and a quick ROI estimate for eight SDRs. Does that make it easier?",
     "startMs": 263000,
     "endMs": 283000,

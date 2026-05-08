@@ -140,13 +140,13 @@ async function runPipeline(
 async function handleTranscript(
   ws: ServerWebSocket<WSData>,
   state: CoachState,
-  speaker: 'rep' | 'persona',
+  speaker: 'founder' | 'persona',
   text: string,
   itemId: string,
 ): Promise<void> {
   const utterance: Utterance = {
     id: itemId,
-    speaker: speaker === 'persona' ? 'customer' : 'rep',
+    speaker: speaker === 'persona' ? 'customer' : 'founder',
     text,
     startMs: Date.now() - state.createdAt,
     endMs: Date.now() - state.createdAt,

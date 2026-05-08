@@ -1,7 +1,7 @@
 [
   {
     "id": "u1",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Hi Maya, thanks for taking the time today. I'm Alex from Artisan. Quick housekeeping — I may take a few notes as we go, hope that's alright.",
     "startMs": 0,
     "endMs": 8500,
@@ -17,7 +17,7 @@
   },
   {
     "id": "u3",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Great. So you clicked through our workflow automation case study last week — what was the context there? What's prompting the look at outbound right now?",
     "startMs": 21000,
     "endMs": 31000,
@@ -33,7 +33,7 @@
   },
   {
     "id": "u5",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That's a classic problem when you're stitching together a stack. How long has this been the situation — is this new, or have you been living with it for a while?",
     "startMs": 63000,
     "endMs": 75000,
@@ -49,7 +49,7 @@
   },
   {
     "id": "u7",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That's completely fair — and honestly it's the number one thing we hear. The reason we can do two weeks is there's no implementation project, no SE engagement, no professional services. Ava connects to HubSpot in about forty minutes. If you're not live in two weeks, we refund the first month.",
     "startMs": 113000,
     "endMs": 138000,
@@ -65,7 +65,7 @@
   },
   {
     "id": "u9",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "None. Self-serve setup, we have a migration assistant that pulls your existing HubSpot sequences. And on the AI personalization side — Ava learns from your reply patterns over time, so the sequences get sharper as data comes in.",
     "startMs": 159000,
     "endMs": 178000,
@@ -81,7 +81,7 @@
   },
   {
     "id": "u11",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Full bidirectional sync — HubSpot, Salesforce, Gong if you want it. All writes happen automatically. So on budget — have you scoped this at all, or is that still TBD?",
     "startMs": 216000,
     "endMs": 235000,
@@ -97,7 +97,7 @@
   },
   {
     "id": "u13",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Good to know — that's definitely workable. Is there a timeline pressure, or is this more of a 'whenever we find the right thing' situation?",
     "startMs": 265000,
     "endMs": 280000,
@@ -113,7 +113,7 @@
   },
   {
     "id": "u15",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Mid-June is very doable with a two-week deploy. One question on process — is this your call, or are there other stakeholders we'd need to get comfortable?",
     "startMs": 311000,
     "endMs": 328000,
@@ -129,7 +129,7 @@
   },
   {
     "id": "u17",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "That's helpful. Would it make sense to do a product demo with both of you — you and Marcus — so he can see the integration piece firsthand? We can get pretty technical on the RevOps side if that helps.",
     "startMs": 363000,
     "endMs": 385000,
@@ -145,7 +145,7 @@
   },
   {
     "id": "u19",
-    "speaker": "rep",
+    "speaker": "founder",
     "text": "Tuesday works. I'll send a calendar invite for both of you with a short agenda — we'll focus on the HubSpot sync and the workflow automation layer. Looking forward to it, Maya.",
     "startMs": 403000,
     "endMs": 422000,

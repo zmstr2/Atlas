@@ -1,115 +1,142 @@
 import { Database } from 'bun:sqlite';
-import type { MeetingMemory, Utterance, Suggestion } from '@atlas/types';
+import path from 'node:path';
+import { mkdirSync } from 'node:fs';
+import type { MeetingMemory, Utterance, Suggestion, SpeakerRole, PreCallBrief } from '@atlas/types';
+import { runMigrations } from './migrations';
 
-const db = new Database(process.env.SQLITE_PATH ?? 'atlas.db', { create: true });
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS calls (
-    id TEXT PRIMARY KEY,
-    script TEXT NOT NULL,
-    started_at INTEGER NOT NULL,
-    ended_at INTEGER,
-    memory_snapshot TEXT,
-    verdict TEXT,
-    training_delta TEXT,
-    follow_up_email TEXT,
-    call_log TEXT,
-    total_cost_usd REAL DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS utterances (
-    id TEXT PRIMARY KEY,
-    call_id TEXT NOT NULL,
-    speaker TEXT NOT NULL,
-    text TEXT NOT NULL,
-    start_ms INTEGER NOT NULL,
-    end_ms INTEGER NOT NULL,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-  );
-
-  CREATE TABLE IF NOT EXISTS ip_sessions (
-    ip TEXT NOT NULL,
-    date TEXT NOT NULL,
-    count INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (ip, date)
-  );
-
-  CREATE TABLE IF NOT EXISTS suggestions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    call_id TEXT NOT NULL,
-    utterance_id TEXT NOT NULL,
-    turn_counter INTEGER NOT NULL,
-    agent TEXT NOT NULL,
-    should_fire INTEGER NOT NULL,
-    suppressed INTEGER NOT NULL,
-    priority TEXT NOT NULL,
-    play TEXT NOT NULL,
-    markdown TEXT NOT NULL,
-    reasoning TEXT NOT NULL,
-    grounded_utterance_ids TEXT NOT NULL,
-    grounded_anchor_turn_ids TEXT NOT NULL,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_suggestions_call ON suggestions(call_id, created_at);
-  CREATE INDEX IF NOT EXISTS idx_utterances_call ON utterances(call_id, created_at);
-`);
-
-// Tiny migration: add columns introduced after initial schema.
-// SQLite doesn't have ALTER TABLE IF NOT EXISTS, so we check pragma first.
-const callsCols = db.query('PRAGMA table_info(calls)').all() as Array<{ name: string }>;
-const callsColNames = new Set(callsCols.map(c => c.name));
-if (!callsColNames.has('follow_up_email')) {
-  db.exec('ALTER TABLE calls ADD COLUMN follow_up_email TEXT');
-}
-if (!callsColNames.has('total_cost_usd')) {
-  db.exec('ALTER TABLE calls ADD COLUMN total_cost_usd REAL DEFAULT 0');
+// Resolve DB path. Precedence:
+//   1. SQLITE_PATH (full path override, used by tests and the web demo)
+//   2. ATLAS_DATA_DIR/atlas.db — production path. On Railway this points at a
+//      mounted persistent volume (/data). Without ATLAS_DATA_DIR the container
+//      filesystem is ephemeral and every redeploy wipes user data.
+//   3. ./atlas.db (dev default when running `bun run dev:agent` locally)
+function resolveDbPath(): string {
+  if (process.env.SQLITE_PATH) return process.env.SQLITE_PATH;
+  if (process.env.ATLAS_DATA_DIR) {
+    mkdirSync(process.env.ATLAS_DATA_DIR, { recursive: true });
+    return path.join(process.env.ATLAS_DATA_DIR, 'atlas.db');
+  }
+  return 'atlas.db';
 }
 
-export function createCall(id: string, script: string) {
+const db = new Database(resolveDbPath(), { create: true });
+runMigrations(db);
+
+/** Sentinel userId for the public web demo flow (no auth required). */
+export const DEMO_USER_ID = '__demo__';
+
+// ── calls ──────────────────────────────────────────────────────────────────
+
+/**
+ * Create a call row. `script` is set for legacy demo replay; for real
+ * desktop calls pass null and supply prospect_name + brief_json instead.
+ *
+ * `userId` scopes the call to a Supabase auth user. The web demo uses
+ * `DEMO_USER_ID`. Multi-tenant queries (loadCall, listCalls, etc.) filter
+ * by userId so users can't see each other's calls.
+ */
+export function createCall(
+  id: string,
+  userId: string,
+  opts: { script?: string | null; prospectName?: string | null; meetingUrl?: string | null; brief?: PreCallBrief | null } = {},
+) {
   db.run(
-    'INSERT INTO calls (id, script, started_at) VALUES (?, ?, ?)',
-    [id, script, Date.now()]
+    `INSERT INTO calls (id, user_id, script, prospect_name, meeting_url, brief_json, status, started_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`,
+    [
+      id,
+      userId,
+      opts.script ?? null,
+      opts.prospectName ?? null,
+      opts.meetingUrl ?? null,
+      opts.brief ? JSON.stringify(opts.brief) : null,
+      Date.now(),
+    ],
   );
 }
 
 export function saveMemorySnapshot(callId: string, memory: MeetingMemory) {
   db.run(
     'UPDATE calls SET memory_snapshot = ? WHERE id = ?',
-    [JSON.stringify(memory), callId]
+    [JSON.stringify(memory), callId],
   );
 }
 
-export function finalizeCall(callId: string) {
-  db.run('UPDATE calls SET ended_at = ? WHERE id = ?', [Date.now(), callId]);
-}
-
-export function checkAndIncrementIpSession(ip: string, dailyCap: number): boolean {
-  const today = new Date().toISOString().slice(0, 10);
+export function finalizeCall(callId: string, userId: string) {
   db.run(
-    `INSERT INTO ip_sessions (ip, date, count) VALUES (?, ?, 1)
-     ON CONFLICT (ip, date) DO UPDATE SET count = count + 1`,
-    [ip, today]
+    `UPDATE calls SET ended_at = ?, status = 'ended' WHERE id = ? AND user_id = ?`,
+    [Date.now(), callId, userId],
   );
-  const row = db.query('SELECT count FROM ip_sessions WHERE ip = ? AND date = ?')
-    .get(ip, today) as { count: number } | null;
-  return (row?.count ?? 0) <= dailyCap;
 }
 
-export function recordUtterance(callId: string, u: Utterance) {
+export function updateCallStatus(callId: string, status: 'active' | 'ended' | 'failed') {
+  db.run('UPDATE calls SET status = ? WHERE id = ?', [status, callId]);
+}
+
+export function saveCoachingArtifact(callId: string, artifact: unknown) {
+  db.run(
+    'UPDATE calls SET coaching_artifact = ? WHERE id = ?',
+    [JSON.stringify(artifact), callId],
+  );
+}
+
+export function saveVerdict(callId: string, verdict: unknown) {
+  db.run('UPDATE calls SET verdict = ? WHERE id = ?', [JSON.stringify(verdict), callId]);
+}
+
+export function saveFollowUpEmail(callId: string, email: string) {
+  db.run('UPDATE calls SET follow_up_email = ? WHERE id = ?', [email, callId]);
+}
+
+// ── participants ───────────────────────────────────────────────────────────
+
+export function upsertParticipant(opts: {
+  callId: string;
+  participantId: string;
+  displayName?: string | null;
+  role: SpeakerRole;
+}) {
+  db.run(
+    `INSERT INTO participants (call_id, participant_id, display_name, role)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT (call_id, participant_id) DO UPDATE
+       SET display_name = COALESCE(excluded.display_name, display_name),
+           role = excluded.role`,
+    [opts.callId, opts.participantId, opts.displayName ?? null, opts.role],
+  );
+}
+
+export function loadParticipants(callId: string): Array<{
+  participantId: string;
+  displayName: string | null;
+  role: SpeakerRole;
+}> {
+  const rows = db.query(
+    `SELECT participant_id as participantId, display_name as displayName, role
+     FROM participants WHERE call_id = ? ORDER BY first_seen_at ASC`,
+  ).all(callId) as Array<{ participantId: string; displayName: string | null; role: SpeakerRole }>;
+  return rows;
+}
+
+// ── utterances ─────────────────────────────────────────────────────────────
+
+export function recordUtterance(callId: string, userId: string, u: Utterance) {
   try {
     db.run(
-      `INSERT OR IGNORE INTO utterances (id, call_id, speaker, text, start_ms, end_ms, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [u.id, callId, u.speaker, u.text, u.startMs, u.endMs, Date.now()]
+      `INSERT OR IGNORE INTO utterances (id, call_id, user_id, participant_id, speaker, text, start_ms, end_ms, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [u.id, callId, userId, u.participantId ?? null, u.speaker, u.text, u.startMs, u.endMs, Date.now()],
     );
   } catch (err) {
     console.error('[sqlite] recordUtterance failed', u.id, err);
   }
 }
 
+// ── suggestions ────────────────────────────────────────────────────────────
+
 export function recordSuggestion(
   callId: string,
+  userId: string,
   utteranceId: string,
   turnCounter: number,
   s: Suggestion,
@@ -118,28 +145,32 @@ export function recordSuggestion(
   try {
     db.run(
       `INSERT INTO suggestions (
-         call_id, utterance_id, turn_counter, agent,
+         call_id, user_id, utterance_id, turn_counter, agent,
          should_fire, suppressed, priority, play, markdown, reasoning,
          grounded_utterance_ids, grounded_anchor_turn_ids, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        callId, utteranceId, turnCounter, s.agent,
+        callId, userId, utteranceId, turnCounter, s.agent,
         s.shouldFire ? 1 : 0, suppressed ? 1 : 0,
         s.priority, s.play, s.markdown, s.reasoning,
         JSON.stringify(s.groundedInUtteranceIds),
         JSON.stringify(s.groundedInAnchorTurnIds),
         Date.now(),
-      ]
+      ],
     );
   } catch (err) {
     console.error('[sqlite] recordSuggestion failed', utteranceId, err);
   }
 }
 
+// ── reads ──────────────────────────────────────────────────────────────────
+
 export type LoadedUtteranceRow = {
   id: string;
   call_id: string;
-  speaker: 'rep' | 'customer';
+  user_id: string;
+  participant_id: string | null;
+  speaker: SpeakerRole;
   text: string;
   start_ms: number;
   end_ms: number;
@@ -149,6 +180,7 @@ export type LoadedUtteranceRow = {
 export type LoadedSuggestionRow = {
   id: number;
   call_id: string;
+  user_id: string;
   utterance_id: string;
   turn_counter: number;
   agent: 'prospect_suggester' | 'rep_watcher';
@@ -165,38 +197,193 @@ export type LoadedSuggestionRow = {
 
 export type LoadedCallRow = {
   id: string;
-  script: string;
+  user_id: string;
+  script: string | null;
+  prospect_name: string | null;
+  meeting_url: string | null;
+  brief_json: string | null;
+  status: 'active' | 'ended' | 'failed';
   started_at: number;
   ended_at: number | null;
+  verdict: string | null;
+  coaching_artifact: string | null;
+  follow_up_email: string | null;
+  verdict_status: string | null;
+  coaching_status: string | null;
+  followup_status: string | null;
 };
 
-export function loadCall(callId: string): LoadedCallRow | null {
+export function loadCall(callId: string, userId: string): LoadedCallRow | null {
   return db.query(
-    'SELECT id, script, started_at, ended_at FROM calls WHERE id = ?'
-  ).get(callId) as LoadedCallRow | null;
+    `SELECT id, user_id, script, prospect_name, meeting_url, brief_json, status,
+            started_at, ended_at, verdict, coaching_artifact, follow_up_email,
+            verdict_status, coaching_status, followup_status
+     FROM calls WHERE id = ? AND user_id = ?`,
+  ).get(callId, userId) as LoadedCallRow | null;
 }
 
-export function loadCallLog(callId: string): {
+/**
+ * Persist the result of one post-call agent step on the call row. `status`
+ * is either 'ok' or 'failed:<truncated message>'. Step is type-restricted so
+ * the column name is never user-controlled (no SQL-injection surface).
+ */
+export type PostCallStep = 'verdict' | 'coaching' | 'followup';
+const POST_CALL_STATUS_COLUMNS: Record<PostCallStep, string> = {
+  verdict: 'verdict_status',
+  coaching: 'coaching_status',
+  followup: 'followup_status',
+};
+
+export function setPostCallStatus(
+  callId: string,
+  step: PostCallStep,
+  status: string,
+): void {
+  const column = POST_CALL_STATUS_COLUMNS[step];
+  // Cap message length so we don't blow out the row on a multi-MB stack
+  // trace (jose / node fetch can produce huge errors).
+  const truncated = status.length > 500 ? status.slice(0, 500) : status;
+  try {
+    db.run(`UPDATE calls SET ${column} = ? WHERE id = ?`, [truncated, callId]);
+  } catch (err) {
+    console.error('[sqlite] setPostCallStatus failed', callId, step, err);
+  }
+}
+
+export function listCalls(userId: string, limit = 100): Array<Pick<LoadedCallRow,
+  'id' | 'user_id' | 'script' | 'prospect_name' | 'status' | 'started_at' | 'ended_at'
+>> {
+  return db.query(
+    `SELECT id, user_id, script, prospect_name, status, started_at, ended_at
+     FROM calls WHERE user_id = ? ORDER BY started_at DESC LIMIT ?`,
+  ).all(userId, limit) as Array<Pick<LoadedCallRow,
+    'id' | 'user_id' | 'script' | 'prospect_name' | 'status' | 'started_at' | 'ended_at'
+  >>;
+}
+
+export function loadCallLog(callId: string, userId: string): {
   utterances: LoadedUtteranceRow[];
   suggestions: LoadedSuggestionRow[];
 } {
   const utterances = db.query(
-    'SELECT * FROM utterances WHERE call_id = ? ORDER BY created_at ASC, id ASC'
-  ).all(callId) as LoadedUtteranceRow[];
+    'SELECT * FROM utterances WHERE call_id = ? AND user_id = ? ORDER BY created_at ASC, id ASC',
+  ).all(callId, userId) as LoadedUtteranceRow[];
   const suggestions = db.query(
-    'SELECT * FROM suggestions WHERE call_id = ? ORDER BY created_at ASC, id ASC'
-  ).all(callId) as LoadedSuggestionRow[];
+    'SELECT * FROM suggestions WHERE call_id = ? AND user_id = ? ORDER BY created_at ASC, id ASC',
+  ).all(callId, userId) as LoadedSuggestionRow[];
   return { utterances, suggestions };
 }
 
-// Daily spend uses the materialized total_cost_usd column written at finalize time.
-export function getDailySpendUsd(): number {
+// ── per-user spend ─────────────────────────────────────────────────────────
+
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Returns today's accumulated spend for a single user. */
+export function getDailySpendUsd(userId: string): number {
+  const row = db.query(
+    'SELECT COALESCE(total_cost_usd, 0) AS total FROM user_quotas WHERE user_id = ? AND date = ?',
+  ).get(userId, todayUtc()) as { total: number } | null;
+  return row?.total ?? 0;
+}
+
+// ── cost-attribution health ───────────────────────────────────────────────
+// We swallow cost-tracking errors so a SQLite hiccup can't break the LLM
+// hot path — but a *silent* swallow means a stuck DB lets users blow past
+// daily spend caps indefinitely. Track a counter the /health endpoint
+// surfaces so an oncall alert can fire when this drifts.
+
+let costAttributionFailures = 0;
+
+export function getCostAttributionFailureCount(): number {
+  return costAttributionFailures;
+}
+
+/** Test-only reset for the failure counter. */
+export function _resetCostAttributionFailureCount(): void {
+  costAttributionFailures = 0;
+}
+
+function recordCostAttributionFailure(label: string, err: unknown): void {
+  costAttributionFailures += 1;
+  console.error(`[sqlite] ${label} failed (cumulative=${costAttributionFailures})`, err);
+}
+
+/**
+ * Bump the running cost for a single call. Used by the LLM wrapper to
+ * attribute every completion to the call that triggered it. Errors are
+ * swallowed (DB cost-tracking must never break the hot path) but counted —
+ * see getCostAttributionFailureCount.
+ */
+export function incrementCallCost(callId: string, costUsd: number): void {
+  try {
+    db.run('UPDATE calls SET total_cost_usd = COALESCE(total_cost_usd, 0) + ? WHERE id = ?', [costUsd, callId]);
+  } catch (err) {
+    recordCostAttributionFailure('incrementCallCost', err);
+  }
+}
+
+/**
+ * UPSERT: bump per-user spend + call count for today. Errors swallowed for
+ * the same reason as incrementCallCost — but with a counter, so a stuck DB
+ * doesn't silently disable the daily spend cap.
+ */
+export function incrementUserSpend(userId: string, costUsd: number, callIncrement = 0): void {
+  try {
+    db.run(
+      `INSERT INTO user_quotas (user_id, date, total_cost_usd, call_count)
+         VALUES (?, ?, ?, ?)
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         total_cost_usd = total_cost_usd + excluded.total_cost_usd,
+         call_count = call_count + excluded.call_count`,
+      [userId, todayUtc(), costUsd, callIncrement],
+    );
+  } catch (err) {
+    recordCostAttributionFailure('incrementUserSpend', err);
+  }
+}
+
+/**
+ * Global daily-spend ceiling — sums today's spend across ALL users.
+ * Demo route still uses this for the $20/day global cap.
+ */
+export function getGlobalDailySpendUsd(): number {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const cutoff = startOfDay.getTime();
-
   const row = db.query(
-    'SELECT COALESCE(SUM(total_cost_usd), 0) AS total FROM calls WHERE started_at >= ?'
+    'SELECT COALESCE(SUM(total_cost_usd), 0) AS total FROM calls WHERE started_at >= ?',
   ).get(cutoff) as { total: number } | null;
   return row?.total ?? 0;
+}
+
+// ── legacy demo IP rate-limit shim ─────────────────────────────────────────
+// The web demo (apps/web with practice mode) still wants a global IP cap.
+// In-memory because the desktop app no longer cares about IP rate limits.
+
+const memoryIpSessions = new Map<string, number>();
+
+export function checkAndIncrementIpSession(ip: string, dailyCap: number): boolean {
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `${ip}:${today}`;
+  const next = (memoryIpSessions.get(key) ?? 0) + 1;
+  memoryIpSessions.set(key, next);
+  return next <= dailyCap;
+}
+
+// ── test reset ─────────────────────────────────────────────────────────────
+
+/** Test-only: drop tables and re-run migrations. */
+export function _resetDbForTests(): void {
+  db.exec(`
+    DROP TABLE IF EXISTS calls;
+    DROP TABLE IF EXISTS utterances;
+    DROP TABLE IF EXISTS suggestions;
+    DROP TABLE IF EXISTS participants;
+    DROP TABLE IF EXISTS user_quotas;
+    DROP TABLE IF EXISTS schema_version;
+  `);
+  memoryIpSessions.clear();
+  runMigrations(db);
 }

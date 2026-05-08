@@ -96,12 +96,12 @@ describe('MemoryStore.applyPatch', () => {
     const store = new MemoryStore();
     store.applyPatch({
       utteranceId: 'u1',
-      openLoops: [{ op: 'append', description: 'send one-pager to Marcus', owner: 'rep', closeDescription: null }],
+      openLoops: [{ op: 'append', description: 'send one-pager to Marcus', owner: 'founder', closeDescription: null }],
     });
     expect(store.snapshot.openLoops[0].status).toBe('open');
     store.applyPatch({
       utteranceId: 'u2',
-      openLoops: [{ op: 'close', description: 'send one-pager to Marcus', owner: 'rep', closeDescription: null }],
+      openLoops: [{ op: 'close', description: 'send one-pager to Marcus', owner: 'founder', closeDescription: null }],
     });
     expect(store.snapshot.openLoops[0].status).toBe('addressed');
   });

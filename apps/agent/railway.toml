@@ -5,3 +5,18 @@ builder = "nixpacks"
 startCommand = "bun run src/index.ts"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
+
+# SQLite is persisted on a Railway-attached volume. Without a volume the
+# container filesystem is wiped on every redeploy, taking all calls,
+# transcripts, coaching artifacts, and per-user spend counters with it.
+#
+# The volume must be created once in the Railway dashboard (or via
+# `railway volume add`) and attached to this service at the same mount
+# path. ATLAS_DATA_DIR is read by resolveDbPath() in apps/agent/src/db/sqlite.ts
+# and the SQLite file lives at $ATLAS_DATA_DIR/atlas.db.
+[[deploy.volumes]]
+mountPath = "/data"
+name = "atlas-agent-data"
+
+[deploy.env]
+ATLAS_DATA_DIR = "/data"

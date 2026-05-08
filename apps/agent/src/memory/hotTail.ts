@@ -1,8 +1,8 @@
-import type { Utterance } from '@atlas/types';
+import type { Utterance, SpeakerRole } from '@atlas/types';
 
 export type HotTailEntry = {
   id: string;
-  speaker: 'rep' | 'customer';
+  speaker: SpeakerRole;
   text: string;
   ts: number;
 };
@@ -29,7 +29,7 @@ export class HotTail {
   }
 
   /** Most recent utterance from the *other* speaker (for short-answer interpretation). */
-  lastFromOtherSpeaker(currentSpeaker: 'rep' | 'customer'): HotTailEntry | null {
+  lastFromOtherSpeaker(currentSpeaker: SpeakerRole): HotTailEntry | null {
     for (let i = this.buf.length - 1; i >= 0; i--) {
       if (this.buf[i].speaker !== currentSpeaker) return this.buf[i];
     }

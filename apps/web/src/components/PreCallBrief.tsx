@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import type { PreCallBrief } from '@atlas/types';
+import { getProspect } from '@atlas/types';
 
 export function PreCallBriefHeader({
   brief,
@@ -13,6 +14,10 @@ export function PreCallBriefHeader({
   rightSlot?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const prospect = getProspect(brief);
+  const scoringSignals = brief.avaContext?.scoringSignals ?? [];
+  const suggestedQuestions = brief.suggestedQuestions ?? [];
+  const productSnippets = brief.productSnippets ?? [];
 
   return (
     <div className="border-b border-border bg-bg-elevated">
@@ -26,14 +31,20 @@ export function PreCallBriefHeader({
               />
             )}
             <span className="font-display text-base font-medium text-fg-primary truncate">
-              {brief.lead.name}
+              {prospect.name}
             </span>
-            <span className="text-fg-muted text-sm">·</span>
-            <span className="text-sm text-fg-secondary truncate">{brief.lead.title}</span>
+            {prospect.title && (
+              <>
+                <span className="text-fg-muted text-sm">·</span>
+                <span className="text-sm text-fg-secondary truncate">{prospect.title}</span>
+              </>
+            )}
           </div>
-          <span className="text-xs text-fg-muted">
-            {brief.lead.company} · {brief.lead.companySize}
-          </span>
+          {(prospect.company || prospect.companySize) && (
+            <span className="text-xs text-fg-muted">
+              {[prospect.company, prospect.companySize].filter(Boolean).join(' · ')}
+            </span>
+          )}
         </div>
 
         <div className="ml-auto flex items-center gap-2">
@@ -51,49 +62,64 @@ export function PreCallBriefHeader({
 
       {expanded && (
         <div className="px-6 py-4 space-y-4 border-t border-border bg-bg-muted/30 text-sm">
-          <div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
-              Ava's Scoring Signals
-            </h4>
-            <div className="space-y-1">
-              {brief.avaContext.scoringSignals.map((s) => (
-                <div key={s.signal} className="flex items-center gap-2 text-fg-secondary">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-                  {s.signal}
-                  <span className="text-fg-muted ml-auto font-mono text-xs tabular-nums">
-                    {(s.weight * 100).toFixed(0)}%
-                  </span>
-                </div>
-              ))}
+          {brief.founderContext && (
+            <div>
+              <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
+                Context
+              </h4>
+              <p className="text-fg-secondary whitespace-pre-wrap">{brief.founderContext}</p>
             </div>
-          </div>
+          )}
 
-          <div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
-              Suggested Questions
-            </h4>
-            <ul className="space-y-1">
-              {brief.suggestedQuestions.map((q, i) => (
-                <li key={i} className="text-fg-secondary flex gap-2">
-                  <span className="text-accent shrink-0 tabular-nums">{i + 1}.</span>
-                  {q}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {scoringSignals.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
+                Scoring Signals
+              </h4>
+              <div className="space-y-1">
+                {scoringSignals.map((s) => (
+                  <div key={s.signal} className="flex items-center gap-2 text-fg-secondary">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                    {s.signal}
+                    <span className="text-fg-muted ml-auto font-mono text-xs tabular-nums">
+                      {(s.weight * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-          <div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
-              Product Snippets
-            </h4>
-            <ul className="space-y-1">
-              {brief.productSnippets.map((s, i) => (
-                <li key={i} className="text-fg-secondary italic text-xs">
-                  "{s}"
-                </li>
-              ))}
-            </ul>
-          </div>
+          {suggestedQuestions.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
+                Suggested Questions
+              </h4>
+              <ul className="space-y-1">
+                {suggestedQuestions.map((q, i) => (
+                  <li key={i} className="text-fg-secondary flex gap-2">
+                    <span className="text-accent shrink-0 tabular-nums">{i + 1}.</span>
+                    {q}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {productSnippets.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
+                Product Snippets
+              </h4>
+              <ul className="space-y-1">
+                {productSnippets.map((s, i) => (
+                  <li key={i} className="text-fg-secondary italic text-xs">
+                    "{s}"
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

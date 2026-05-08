@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import type { MeetingMemory, Fact, Concern, OpenLoop, DecisionActor, FlowEntry, VerbatimAnchor, AxisKey, AnchorAxis, Evidence, QualSignal, RelevantFact, PanelPatch } from '@atlas/types';
+import type { MeetingMemory, Fact, Concern, OpenLoop, DecisionActor, FlowEntry, VerbatimAnchor, AxisKey, AnchorAxis, Evidence, QualSignal, RelevantFact, PanelPatch, SpeakerRole } from '@atlas/types';
 import { emptyScorecard, emptyMeetingMemoryExtras } from '@atlas/types';
 import type { ExtractorPatch, MemoryPatch } from '@atlas/types';
 import { computeScorecard } from './scorecard';
@@ -58,7 +58,7 @@ export function createEmptyMemory(): MeetingMemory {
 
 export type CallStats = {
   callStartedAt: number;
-  repWords: number;
+  founderWords: number;
   prospectWords: number;
   turnsSinceLastRepQuestion: number;
   turnsSinceLastNextStepProposal: number;
@@ -74,7 +74,7 @@ export class MemoryStore {
   private cachedSnapshot: MeetingMemory | null = null;
   private stats: CallStats = {
     callStartedAt: Date.now(),
-    repWords: 0,
+    founderWords: 0,
     prospectWords: 0,
     turnsSinceLastRepQuestion: 0,
     turnsSinceLastNextStepProposal: 0,
@@ -85,10 +85,11 @@ export class MemoryStore {
     if (initial) this.rebuildIndices();
   }
 
-  recordUtteranceStats(speaker: 'rep' | 'customer', text: string) {
+  recordUtteranceStats(speaker: SpeakerRole, text: string) {
     const words = text.trim().split(/\s+/).filter(Boolean).length;
-    if (speaker === 'rep') this.stats.repWords += words;
-    else this.stats.prospectWords += words;
+    if (speaker === 'founder') this.stats.founderWords += words;
+    else if (speaker === 'customer') this.stats.prospectWords += words;
+    // 'colleague' / 'other' / 'unknown' don't pollute talkRatio.
     this.stats.turnsSinceLastRepQuestion += 1;
     this.stats.turnsSinceLastNextStepProposal += 1;
   }

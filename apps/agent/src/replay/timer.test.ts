@@ -2,7 +2,9 @@ import { describe, test, expect } from 'bun:test';
 import { ReplayTimer } from './timer';
 import type { Utterance } from '@atlas/types';
 
-const makeUtterance = (id: string, speaker: 'rep' | 'customer', startMs: number, endMs: number): Utterance => ({
+import type { SpeakerRole } from '@atlas/types';
+
+const makeUtterance = (id: string, speaker: SpeakerRole, startMs: number, endMs: number): Utterance => ({
   id,
   speaker,
   text: `Text for ${id}`,
@@ -15,9 +17,9 @@ const makeUtterance = (id: string, speaker: 'rep' | 'customer', startMs: number,
 describe('ReplayTimer', () => {
   test('fires utterances in timestamp order', async () => {
     const transcript: Utterance[] = [
-      makeUtterance('u1', 'rep', 0, 1000),
+      makeUtterance('u1', 'founder', 0, 1000),
       makeUtterance('u2', 'customer', 1100, 2000),
-      makeUtterance('u3', 'rep', 2100, 3000),
+      makeUtterance('u3', 'founder', 2100, 3000),
     ];
 
     const fired: string[] = [];
@@ -41,9 +43,9 @@ describe('ReplayTimer', () => {
 
   test('pause stops firing new events', async () => {
     const transcript: Utterance[] = [
-      makeUtterance('u1', 'rep', 0, 500),
+      makeUtterance('u1', 'founder', 0, 500),
       makeUtterance('u2', 'customer', 100, 600),
-      makeUtterance('u3', 'rep', 5000, 6000), // far in the future
+      makeUtterance('u3', 'founder', 5000, 6000), // far in the future
     ];
 
     const fired: string[] = [];
@@ -70,7 +72,7 @@ describe('ReplayTimer', () => {
 
   test('stop prevents all future events', async () => {
     const transcript: Utterance[] = [
-      makeUtterance('u1', 'rep', 0, 100),
+      makeUtterance('u1', 'founder', 0, 100),
       makeUtterance('u2', 'customer', 200, 300),
     ];
 

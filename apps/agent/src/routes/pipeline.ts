@@ -1,4 +1,4 @@
-import type { Utterance, PreCallBrief, MemoryPatch, Suggestion } from '@atlas/types';
+import type { Utterance, PreCallBrief, MemoryPatch, Suggestion, SpeakerRole } from '@atlas/types';
 import { MemoryStore } from '../memory/store';
 import { HotTail } from '../memory/hotTail';
 import { buildCallFactsUI } from '../memory/factsUI';
@@ -9,9 +9,11 @@ import { runRepWatcher } from '../agents/repWatcher';
 import { runSuggester, type RecentSuggestionEntry } from '../agents/suggester';
 import { broadcastEvent, updateSessionMemory } from '../sse/handler';
 import { saveMemorySnapshot, recordUtterance, recordSuggestion } from '../db/sqlite';
+import { costContext } from '../llm/context';
 
 export type PipelineSession = {
   callId: string;
+  userId: string;
   brief: PreCallBrief;
   store: MemoryStore;
   hotTail: HotTail;
@@ -27,12 +29,13 @@ export type PipelineSession = {
 const RECENT_SUGGESTIONS_WINDOW = 6;
 const SUGGESTER_MODE = (process.env.SUGGESTER_MODE ?? 'merged') as 'split' | 'merged';
 
-export function createPipelineSession(callId: string, brief: PreCallBrief): PipelineSession {
+export function createPipelineSession(callId: string, userId: string, brief: PreCallBrief): PipelineSession {
   const store = new MemoryStore();
   const hotTail = new HotTail(5);
 
   const session: PipelineSession = {
     callId,
+    userId,
     brief,
     store,
     hotTail,
@@ -88,7 +91,7 @@ function shouldBroadcastSuggestion(session: PipelineSession, s: Suggestion): boo
   return true;
 }
 
-function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, speaker: 'rep' | 'customer') {
+function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, speaker: SpeakerRole) {
   session.recentSuggestions.push({
     turn: session.turnCounter,
     speaker,
@@ -104,13 +107,24 @@ function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, spe
 }
 
 export async function processUtterance(session: PipelineSession, utterance: Utterance) {
-  const { callId, brief, store, hotTail, transcript } = session;
+  // Establish the cost-tracking context for this turn. Every LLM call made
+  // (transitively) inside this function — memory agent, suggester, panel
+  // agent — reads userId/callId from this AsyncLocalStorage frame and
+  // attributes cost back to the right user without us having to thread
+  // userId through every agent signature.
+  return costContext.run({ userId: session.userId, callId: session.callId }, () =>
+    processUtteranceInner(session, utterance),
+  );
+}
+
+async function processUtteranceInner(session: PipelineSession, utterance: Utterance) {
+  const { callId, userId, brief, store, hotTail, transcript } = session;
 
   // Synchronous bookkeeping
   transcript.push(utterance);
   hotTail.push(utterance);
   store.recordUtteranceStats(utterance.speaker, utterance.text);
-  recordUtterance(callId, utterance);
+  recordUtterance(callId, userId, utterance);
   broadcastEvent(callId, { type: 'utterance', utterance });
   broadcastEvent(callId, { type: 'pulse', utteranceId: utterance.id });
 
@@ -129,9 +143,9 @@ export async function processUtterance(session: PipelineSession, utterance: Utte
         brief,
         recentSuggestions: [...session.recentSuggestions],
       })
-    : utterance.speaker === 'customer'
-      ? runProspectSuggester({ utterance, hotTail: tail, prevMemory, brief })
-      : runRepWatcher({ utterance, hotTail: tail, prevMemory, brief });
+    : utterance.speaker === 'founder'
+      ? runRepWatcher({ utterance, hotTail: tail, prevMemory, brief })
+      : runProspectSuggester({ utterance, hotTail: tail, prevMemory, brief });
 
   // Memory agent (NON-BLOCKING, runs in parallel)
   const memoryPromise = runMemoryAgent({
@@ -153,13 +167,13 @@ export async function processUtterance(session: PipelineSession, utterance: Utte
       session.lastSuggestionTurn = session.turnCounter;
       session.lastSuggestionAgent = suggestion.agent;
       pushRecent(session, suggestion, true, utterance.speaker);
-      recordSuggestion(callId, utterance.id, session.turnCounter, suggestion, false);
+      recordSuggestion(callId, userId, utterance.id, session.turnCounter, suggestion, false);
     } else if (suggestion.shouldFire) {
       // Record what the model wanted to fire even when gated, so we can audit
       // suppression decisions offline. Also feed the recent-suggestions window so
       // the merged agent can see what it almost-fired.
       pushRecent(session, suggestion, false, utterance.speaker);
-      recordSuggestion(callId, utterance.id, session.turnCounter, suggestion, true);
+      recordSuggestion(callId, userId, utterance.id, session.turnCounter, suggestion, true);
     } else {
       // Model chose silence. Push to the in-memory window (not the DB) so the
       // cadence rule "3 of last 5 fired" measures last-5-TURNS, not
@@ -183,7 +197,7 @@ export async function processUtterance(session: PipelineSession, utterance: Utte
           utteranceId: utterance.id,
           turnId,
         });
-        if (utterance.speaker === 'customer') {
+        if (utterance.speaker !== 'founder') {
           const ui = buildCallFactsUI(store.snapshot);
           broadcastEvent(callId, { type: 'facts_ui_delta', ui });
         }

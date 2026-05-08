@@ -37,7 +37,7 @@ export const CallFactsUISchema = z.object({
   openLoops: z.array(z.object({
     id: z.string(),
     description: z.string(),
-    owner: z.enum(['rep', 'customer']),
+    owner: z.enum(['founder', 'customer']),
   })),
   anchors: z.array(z.object({
     axis: z.string(),
@@ -56,7 +56,7 @@ export const CallFactsUISchema = z.object({
   stage: z.object({
     callMinute: z.number(),
     talkRatio: z.object({
-      rep: z.number(),
+      founder: z.number(),
       prospect: z.number(),
     }),
     turnsSinceLastRepQuestion: z.number(),

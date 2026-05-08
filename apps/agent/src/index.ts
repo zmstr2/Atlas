@@ -1,23 +1,5 @@
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { demoRoutes } from './routes/demo';
-import { realtimeRoutes } from './realtime/session';
-import { chatRoutes } from './routes/chat';
+import { app } from './app';
 import { coachWebSocketHandler, type CoachWebSocketData } from './coach/ws';
-
-const app = new Hono();
-
-app.use('*', cors({
-  origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Call-Id'],
-}));
-
-app.route('/demo', demoRoutes);
-app.route('/realtime', realtimeRoutes);
-app.route('/chat', chatRoutes);
-
-app.get('/health', (c) => c.json({ ok: true }));
 
 const PORT = Number(process.env.PORT ?? 3001);
 console.log(`Atlas agent listening on :${PORT}`);

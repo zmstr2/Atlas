@@ -167,10 +167,10 @@ export function buildCallFactsUI(memory: MeetingMemory): CallFactsUI {
     ? { axis: top, humanPrompt: PUSH_PROMPTS[top] }
     : null;
 
-  const totalWords = sc.talkRatio.repWords + sc.talkRatio.prospectWords;
+  const totalWords = sc.talkRatio.founderWords + sc.talkRatio.prospectWords;
   const ratio = totalWords > 0
-    ? { rep: sc.talkRatio.repWords / totalWords, prospect: sc.talkRatio.prospectWords / totalWords }
-    : { rep: 0, prospect: 0 };
+    ? { founder: sc.talkRatio.founderWords / totalWords, prospect: sc.talkRatio.prospectWords / totalWords }
+    : { founder: 0, prospect: 0 };
 
   return {
     bant,

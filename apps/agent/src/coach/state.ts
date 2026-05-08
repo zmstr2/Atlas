@@ -6,7 +6,7 @@ import { HotTail } from '../memory/hotTail';
 import { renderMemoryMarkdown } from '../memory/render';
 import { getPersona } from '../realtime/personas';
 import { clearPipelineChain } from './pipelineChain';
-import { createCall, recordUtterance, recordSuggestion, finalizeCall, loadCall, loadCallLog } from '../db/sqlite';
+import { createCall, recordUtterance, recordSuggestion, finalizeCall, loadCall, loadCallLog, DEMO_USER_ID } from '../db/sqlite';
 import jordanBrief from '../../../../fixtures/jordan-brief.json' with { type: 'json' };
 
 const BRIEFS: Record<PersonaId, PreCallBrief> = {
@@ -23,6 +23,11 @@ export type SuggestionRecord = {
 
 export type CoachState = {
   callId: string;
+  // Coach realtime flow is intentionally unauthenticated (mounted on the
+  // public /realtime route), so userId is DEMO_USER_ID here for spend
+  // attribution. Real desktop calls go through /calls/* with a JWT-derived
+  // userId — this state struct is never used on that path.
+  userId: string;
   personaId: PersonaId;
   persona: PersonaConfig;
   brief: PreCallBrief;
@@ -40,11 +45,13 @@ export type CoachState = {
 const states = new Map<string, CoachState>();
 const TTL_MS = 5 * 60 * 1000;
 
-export function createCoachState(opts: { callId: string; personaId: PersonaId }): CoachState {
+export function createCoachState(opts: { callId: string; personaId: PersonaId; userId?: string }): CoachState {
   const persona = getPersona(opts.personaId);
   const brief = BRIEFS[opts.personaId];
+  const userId = opts.userId ?? DEMO_USER_ID;
   const state: CoachState = {
     callId: opts.callId,
+    userId,
     personaId: opts.personaId,
     persona,
     brief,
@@ -59,7 +66,7 @@ export function createCoachState(opts: { callId: string; personaId: PersonaId })
     transcriptDumped: false,
   };
   states.set(opts.callId, state);
-  createCall(opts.callId, opts.personaId);
+  createCall(opts.callId, userId, { script: opts.personaId, brief: state.brief });
   return state;
 }
 
@@ -75,7 +82,7 @@ export function endCall(callId: string): void {
   if (!state) return;
   state.ended = true;
   state.transcriptDumped = true;
-  finalizeCall(callId);
+  finalizeCall(callId, state.userId);
   dumpTranscriptToFile(callId);
 }
 
@@ -87,7 +94,7 @@ export function appendUtterance(callId: string, utterance: Utterance): void {
   state.memoryStore.recordUtteranceStats(utterance.speaker, utterance.text);
   state.turnCounter += 1;
   state.lastActivity = Date.now();
-  recordUtterance(callId, utterance);
+  recordUtterance(callId, state.userId, utterance);
 }
 
 export function nextTurnId(state: CoachState): string {
@@ -102,6 +109,7 @@ export function appendSuggestion(callId: string, suggestion: SuggestionRecord): 
   // Record as a fired suggestion (voice calls don't suppress)
   recordSuggestion(
     callId,
+    state.userId,
     suggestion.groundedInUtteranceIds[0] ?? state.utterances[state.utterances.length - 1]?.id ?? '',
     state.turnCounter,
     {
@@ -132,12 +140,14 @@ function fmtIso(ts: number): string {
 
 export function dumpTranscriptToFile(callId: string): string | null {
   try {
-    const call = loadCall(callId);
+    const state = states.get(callId);
+    const userId = state?.userId ?? DEMO_USER_ID;
+    const call = loadCall(callId, userId);
     if (!call) {
       console.error('[coach] dumpTranscriptToFile: call not found', callId);
       return null;
     }
-    const { utterances, suggestions } = loadCallLog(callId);
+    const { utterances, suggestions } = loadCallLog(callId, userId);
 
     const dbPath = process.env.SQLITE_PATH ?? 'atlas.db';
     const dir = path.join(path.dirname(path.resolve(dbPath)), 'transcripts');
@@ -249,7 +259,7 @@ setInterval(() => {
     if (!state.ended && now - state.lastActivity > IDLE_FORCE_END_MS) {
       console.log(`[coach] force-ending idle call ${callId}`);
       state.ended = true;
-      finalizeCall(callId);
+      finalizeCall(callId, state.userId);
     }
     if (state.ended && state.lastActivity < cutoff) {
       if (!state.transcriptDumped) {
