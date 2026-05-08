@@ -119,6 +119,30 @@ const COMPANIES: readonly Company[] = [
       { id: 'derek-walsh', name: 'Derek Walsh', title: 'CRO', role: 'economic_buyer', notes: 'Above Rachel. Only involved on >$200k ARR commitments.' },
     ],
   },
+  {
+    id: 'drift-labs',
+    name: 'Drift Labs',
+    domain: 'driftlabs.dev',
+    industry: 'AI dev tools — eval infrastructure for agents',
+    employees: '2 (cofounders)',
+    fundingStage: 'Pre-seed ($400K F&F + angels, 6 months ago)',
+    techStack: ['TypeScript', 'Postgres', 'OpenAI', 'Anthropic', 'Vercel'],
+    recentActivity: [
+      { date: '2026-04-28', summary: 'Mia posted a thread on agent eval frameworks that picked up traction with YC alums.' },
+      { date: '2026-04-10', summary: 'Hit $40K MRR with 50 paying users, growing ~30% MoM (mostly inbound).' },
+      { date: '2026-03-22', summary: 'Bedrock floated a $1.5M @ $10M post pre-seed term sheet (active, not signed).' },
+    ],
+    fitSignals: [
+      'Strong vertical fit (AI dev tools is a YC sweet spot)',
+      'Cofounder pair, both ex-Stripe — execution credibility',
+      'Real revenue ($40K MRR) but still pre-seed by valuation',
+      '8 months runway — decision-forcing window',
+    ],
+    contacts: [
+      { id: 'mia-chen', name: 'Mia Chen', title: 'Cofounder & CTO', role: 'champion', notes: 'Technical cofounder, ex-Stripe payments infra (3 years). Decisive, low-bullshit, respects specifics. The one taking this call.' },
+      { id: 'sam-park', name: 'Sam Park', title: 'Cofounder & Head of Design', role: 'economic_buyer', notes: 'Design-led cofounder, ex-Stripe dashboard team. Skeptical of accelerators — thinks Drift is past the right stage. Mia will not move without him.' },
+    ],
+  },
 ] as const;
 
 const LEADS: readonly Lead[] = [
@@ -177,6 +201,25 @@ const LEADS: readonly Lead[] = [
       { type: 'email', date: '2026-04-20', summary: 'Cold outbound re: SDR productivity. Opened and clicked.' },
     ],
     notes: 'Authority gap: real decision-maker is Rachel Kim (VP Sales), not on the call.',
+  },
+  {
+    id: 'mia-chen',
+    name: 'Mia Chen',
+    title: 'Cofounder & CTO',
+    email: 'mia@driftlabs.dev',
+    companyId: 'drift-labs',
+    leadScore: 0.78,
+    scoringSignals: [
+      { signal: 'Ex-Stripe (Payments Infra, 3 years)', weight: 0.30 },
+      { signal: 'Working product with $40K MRR + 50 paying users', weight: 0.25 },
+      { signal: 'AI dev tools — strong YC vertical fit', weight: 0.20 },
+      { signal: 'Cofounder pair (technical + design)', weight: 0.15 },
+      { signal: 'Posted thoughtful thread on agent eval frameworks', weight: 0.10 },
+    ],
+    pastInteractions: [
+      { type: 'email', date: '2026-04-30', summary: 'Cold outreach referencing eval framework thread. Mia replied within an hour.' },
+    ],
+    notes: 'Pre-seed founder weighing YC ($500K @ ~7%) vs an active Bedrock term sheet ($1.5M @ $10M post). Real decision constraint is cofounder Sam, who is design-led and accelerator-skeptical. Mia will not apply without Sam being convinced — multi-thread early via an alum intro at a comparable stage.',
   },
 ] as const;
 

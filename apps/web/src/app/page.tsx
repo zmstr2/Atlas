@@ -1,7 +1,15 @@
-import dynamic from 'next/dynamic';
-
-const VoiceLandingPage = dynamic(() => import('./VoiceLandingPage'), { ssr: false });
+'use client';
+import { useMemo } from 'react';
+import { nanoid } from 'nanoid';
+import posthog from 'posthog-js';
+import { CallStage } from '@/components/voice/CallStage';
 
 export default function Page() {
-  return <VoiceLandingPage />;
+  const callId = useMemo(() => {
+    const id = `call_${nanoid(10)}`;
+    posthog.capture('call_started', { call_id: id, persona_id: 'mia' });
+    return id;
+  }, []);
+
+  return <CallStage callId={callId} personaId="mia" onEnd={() => {}} />;
 }
