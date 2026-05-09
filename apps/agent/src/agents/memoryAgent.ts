@@ -60,7 +60,61 @@ FACT KEY CONVENTIONS (speaker-aware):
 CONCERN RESOLUTION:
 - When a FOUNDER utterance substantively addresses an active concern (acknowledges + answers + the prospect engages constructively without re-raising), emit concerns: [{op: 'resolve', topic: '<exact existing topic>', verbatim: '<founder's response>', severity: '<original>'}].
 - Use the EXACT topic string from EXISTING ACTIVE CONCERNS — never paraphrase.
-- Only resolve if the response was substantive — boilerplate "I hear you" doesn't count.`;
+- Only resolve if the response was substantive — boilerplate "I hear you" doesn't count.
+
+──── V2 PROMPT-ENGINEERING ADDITIONS (from bench-prompt-v2 results) ──────────
+
+DECISION GEOGRAPHY — only upsert when ROLE is stated:
+- "Hi Jordan, thanks for taking the time"            → do NOT emit decisionGeography (no role yet).
+- "Jordan Hayes — VP Marketing here at MidCo"        → emit {name:"Jordan Hayes", role:"VP Marketing", sentiment:"unknown"}.
+- "Marcus from RevOps holds the tooling keys"        → emit {name:"Marcus", role:"RevOps / tooling owner", sentiment:"unknown"}.
+- "Priya — my demand gen manager"                    → emit {name:"Priya", role:"Demand Gen Manager", sentiment:"unknown"}.
+If you would emit role:null or role:"", emit NOTHING for that person on this turn. The next turn will likely supply the role.
+
+AXIS ENUM IS NOT THE FLOW TAG:
+flow.tag describes the SHAPE of the utterance (P-PAIN, P-COMP, P-STAKE, etc.).
+evidence.axis is the BANT/MEDDIC dimension. They are INDEPENDENT.
+- A P-COMP turn ("we tried Marketo before")  → evidence.axis = 'decisionCriteria' or 'identifyPain'  — NEVER 'competitor'.
+- A P-BUY turn ("how does pricing work")     → evidence.axis = 'budget' or 'decisionProcess'         — NEVER 'buying signal'.
+- A P-STAKE turn ("Marcus owns the keys")    → evidence.axis = 'authority' or 'economicBuyer'        — NEVER 'stakeholder'.
+- A P-METRIC turn ("about a year")           → evidence.axis = 'timeline' or 'metrics'                — NEVER 'metric' singular.
+
+ALLOWED evidence.axis values (case-sensitive, exact):
+  need | budget | authority | timeline | metrics | economicBuyer | decisionCriteria | decisionProcess | identifyPain | champion
+
+CONCERNS — emit when the prospect:
+- Voices hesitation:        "gun-shy", "worried about", "not sure if", "concerned that"
+- References past failure:  "last time we tried X it took N months", "Marketo was even worse"
+- Names a specific risk:    "implementation risk is real", "integration could break X"
+- Pushes back on commit:    "I'd need to loop in X first", "Priya might object"
+
+Severity ladder:
+- 'mentioned' = side-comment, easy to deflect with one sentence.
+- 'pressed'   = explicitly blocking unless answered (DEFAULT for past-failure references and named risks).
+- 'blocking'  = explicitly stated as a deal-breaker ("we won't move forward until X").
+When in doubt, prefer 'pressed' over 'mentioned' — the suggester needs to surface real friction.
+
+OPEN LOOPS — emit when EITHER speaker:
+- Asks a question that needs a follow-up answer  → owner = whoever ASKED
+- Commits to a future action                     → owner = whoever WILL DO IT
+- Surfaces a topic the other party will address  → owner = the party who will address it
+
+Use op='append' to open. Use op='close' with a non-null closeDescription ONLY when this turn substantively answers an existing open loop.
+A turn with no question and no commitment has openLoops=null.
+
+EXAMPLES (emit these exact shapes):
+- Founder asks "what's prompting this?"     → {op:'append', owner:'founder', description:'context for outbound interest', closeDescription:null}
+- Prospect: "I'd need to loop in Marcus"    → {op:'append', owner:'customer', description:'loop in Marcus from RevOps before signing', closeDescription:null}
+- Founder: "I'll send a calendar invite"    → {op:'append', owner:'founder', description:'send calendar invite for three-way demo', closeDescription:null}
+
+EVIDENCE IS REQUIRED, OPEN-LOOPS/CONCERNS ARE ADDITIVE:
+For every axis-relevant signal in the utterance, emit an evidence item FIRST. Then layer in openLoops/concerns if applicable. Do NOT skip evidence to save tokens for other categories.
+
+ENUM LITERALS — use these EXACT strings (case-sensitive):
+- direction:    'positive' | 'negative'                              — NEVER 'pos', 'neg', 'have', 'lack', 'present', 'absent'.
+- sentiment:    'positive' | 'neutral' | 'negative' | 'unknown'      — use 'unknown' when no sentiment expressed.
+- specificity:  'mention' | 'specific'
+- severity:     'mentioned' | 'pressed' | 'blocking'`;
 
 // Schema the extractor LLM is constrained to. bantRender + relevantFacts are
 // owned by the panel agent now; we strip them from the LLM's output surface.
