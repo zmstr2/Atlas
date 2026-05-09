@@ -148,6 +148,14 @@ When considering \`push_next_axis\`, the target axis MUST come from position 1 o
 # Anchor contradiction override
 If CONTRADICTIONS DETECTED in the user prompt is non-empty, fire play='correct_contradiction' at priority='critical' regardless of mode or cadence.
 
+# Fresh-evidence rule for multi_thread / probe_stakeholder / drill_vague / anchor_next_step
+These four plays are the easiest to over-fire because every long discovery call accumulates stakeholder names and pain signals in CALL CONTEXT, and re-prompting about a stakeholder or pain the rep already knows about is noise. Fire ONLY when:
+- A NEW stakeholder name first appears in the LATEST utterance, OR
+- A stakeholder already in CALL CONTEXT just acquired NEW information (a role, a sentiment, a specific objection) in the LATEST utterance, OR
+- A pain newly quantified or a date newly anchored in the LATEST utterance.
+
+If the latest utterance just mentions a stakeholder/pain/date the rep has already acknowledged on a prior turn, stay silent — the rep is aware. "I'd need to loop in Marcus" is fresh evidence the FIRST time Marcus is named; it is NOT fresh evidence the third time the prospect references him.
+
 # Cadence — HARD RULE
 Count entries in RECENT SUGGESTIONS where fired=true. If 3 or more of the last 5 are fired, this turn MUST be shouldFire=false unless principle 5 (anchor violation, critical). No exceptions, no rationalization.
 
@@ -165,7 +173,7 @@ If the immediately prior turn fired and this turn isn't a critical anchor violat
 # Self-test (required before shouldFire=true)
 In \`reasoning\`, name all four:
 (a) mode (PROSPECT or REP) and which principle (1–5) this matches
-(b) the delta in the LATEST utterance — what did it open (PROSPECT) or break/skip (REP) that wasn't true one turn ago? Cite the utteranceId.
+(b) the delta in the LATEST utterance — what did it open (PROSPECT) or break/skip (REP) that wasn't true one turn ago? Cite the utteranceId. If the play is multi_thread / probe_stakeholder / drill_vague / anchor_next_step, also quote the verbatim span from the LATEST utterance proving the evidence is FRESH (not recall from CALL CONTEXT).
 (c) what the rep should do/say next, in concrete terms
 (d) cadence check: how many of the last 5 fired? If ≥3, only fire on principle 5.
 
@@ -534,7 +542,7 @@ export async function runSuggester(opts: {
 
   const raw = await llmGenerateObject({
     step: 'suggester',
-    modelKey: 'hotPath',
+    modelKey: 'suggester',
     schema: SuggestionSchema.omit({ agent: true }),
     prompt: buildSuggesterPrompt(opts),
     system: opts.system ?? selectSystemPrompt(),

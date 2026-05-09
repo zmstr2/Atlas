@@ -83,7 +83,7 @@ Decide whether the rep made a mistake or missed a cue. Output the structured Sug
 
   const raw = await llmGenerateObject({
     step: 'rep_watcher',
-    modelKey: 'hotPath',
+    modelKey: 'suggester',
     schema: SuggestionSchema.omit({ agent: true }),
     prompt,
     system: SYSTEM,
