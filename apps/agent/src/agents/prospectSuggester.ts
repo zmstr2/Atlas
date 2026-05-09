@@ -44,10 +44,19 @@ to chase if pain isn't yet real.
 # Anchor contradiction override
 If CONTRADICTIONS DETECTED is non-empty in the user prompt, fire play='correct_contradiction' at priority='critical' regardless of the principles above.
 
+# Fresh-evidence rule for multi_thread / probe_stakeholder
+These two plays are the easiest to over-fire because every long discovery call accumulates stakeholder names in CALL CONTEXT, and re-prompting about a stakeholder the founder already knows about is noise. Fire ONLY when:
+- A NEW stakeholder name first appears in the LATEST utterance, OR
+- A stakeholder already in CALL CONTEXT just acquired NEW information (a role, a sentiment, a specific objection) in the LATEST utterance.
+
+If the latest utterance just mentions a stakeholder the founder has already acknowledged on a prior turn, stay silent — the founder is aware. \"I'd need to loop in Marcus\" is fresh evidence the FIRST time Marcus is named; it is NOT fresh evidence the third time the prospect references him.
+
+Apply the same fresh-evidence test to drill_vague (don't re-drill a pain that's already been quantified) and to anchor_next_step (don't re-anchor a date the founder already confirmed).
+
 # Self-test (required before shouldFire=true)
 In the \`reasoning\` field, name all three:
 (a) which principle this moment matches
-(b) the specific evidence — utteranceId, anchor turnId, or brief field — that makes the principle apply right now
+(b) the specific evidence — utteranceId, anchor turnId, or brief field — that makes the principle apply right now AND, if the play is multi_thread / probe_stakeholder / drill_vague / anchor_next_step, the verbatim span from the LATEST utterance proving the evidence is FRESH (not recall from CALL CONTEXT)
 (c) what the founder should do in their next turn
 
 If you cannot name all three concretely, shouldFire=false. Greetings, transitions, on-axis questions, and clear answers that don't open new ground match no principle — stay silent.
@@ -111,7 +120,7 @@ Decide whether to fire a suggestion, and if so which play. Output the structured
 
   const raw = await llmGenerateObject({
     step: 'prospect_suggester',
-    modelKey: 'hotPath',
+    modelKey: 'suggester',
     schema: SuggestionSchema.omit({ agent: true }),
     prompt,
     system: SYSTEM,
