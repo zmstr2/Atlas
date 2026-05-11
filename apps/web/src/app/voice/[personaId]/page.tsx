@@ -15,89 +15,35 @@ const PERSONA_META: Record<PersonaId, { name: string; role: string; org: string;
   'vp-sales': { name: 'Cass Rivera', role: 'VP of Sales', org: 'Forge Analytics', color: '#ef4444' },
 };
 
-function AudioPreview({ micAllowed, micLevel }: { micAllowed: boolean | null; micLevel: number }) {
-  const barCount = 32;
+function MicIcon({ className }: { className?: string }) {
   return (
-    <div className="flex-1 flex flex-col relative min-h-0">
-      {/* Avatar — bottom-left positioning like Meet */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="relative">
-          {/* Mic activity ring */}
-          <div
-            className="absolute inset-[-6px] rounded-full transition-all duration-100"
-            style={{
-              boxShadow: micAllowed && micLevel > 0.08
-                ? `0 0 0 ${Math.round(micLevel * 16 + 2)}px rgba(255,255,255,0.10)`
-                : 'none',
-            }}
-          />
-          <div className="w-28 h-28 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center">
-            <svg className="w-12 h-12 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-        </div>
-      </div>
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+    </svg>
+  );
+}
 
-      {/* Name chip — bottom-left like Meet */}
-      <div className="absolute bottom-[72px] left-4">
-        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-black/50 backdrop-blur-sm">
-          {micAllowed === false && (
-            <svg className="w-3 h-3 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-            </svg>
-          )}
-          <span className="text-white text-xs font-medium tracking-wide">You</span>
-        </div>
-      </div>
+function MicMutedIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+    </svg>
+  );
+}
 
-      {/* Toolbar — full width, pinned to bottom */}
-      <div className="h-16 flex items-center px-5 gap-4 border-t border-white/[0.06]">
-        {/* Mic button */}
-        <button
-          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0 ${
-            micAllowed === false ? 'bg-red-500/80' : 'bg-white/10 hover:bg-white/15'
-          }`}
-          title={micAllowed === false ? 'Microphone blocked' : 'Microphone on'}
-        >
-          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-          </svg>
-        </button>
+function ChevronDown({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
 
-        {/* Level bars */}
-        <div className="flex items-center gap-[2px] h-4 flex-1">
-          {Array.from({ length: barCount }).map((_, i) => {
-            const threshold = i / barCount;
-            const lit = micAllowed === true && micLevel > threshold;
-            return (
-              <div
-                key={i}
-                className="w-[2px] rounded-full flex-1 transition-colors duration-75"
-                style={{
-                  maxWidth: 3,
-                  height: `${Math.round(4 + Math.sin((i / barCount) * Math.PI) * 9)}px`,
-                  backgroundColor: lit ? '#4ade80' : 'rgba(255,255,255,0.12)',
-                }}
-              />
-            );
-          })}
-        </div>
-
-        {/* Mic label */}
-        <div className="flex items-center gap-1.5 text-white/35 text-[11px] shrink-0">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-          </svg>
-          <span>{micAllowed === false ? 'Blocked' : 'Built-in Mic'}</span>
-        </div>
-      </div>
-    </div>
+function MoreIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+    </svg>
   );
 }
 
@@ -109,8 +55,9 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
 
   const [callId, setCallId] = useState<string | null>(null);
   const [micAllowed, setMicAllowed] = useState<boolean | null>(null);
+  const [micMuted, setMicMuted] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
-  const [micLabel, setMicLabel] = useState('Built-in Mic');
+  const [micLabel, setMicLabel] = useState('Default microphone');
   const animFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -137,7 +84,7 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
         tick();
         navigator.mediaDevices.enumerateDevices().then(devices => {
           const mic = devices.find(d => d.kind === 'audioinput');
-          if (mic?.label) setMicLabel(mic.label.replace(/\s*\(.*\)/, '').slice(0, 24));
+          if (mic?.label) setMicLabel(mic.label.replace(/\s*\(.*\)/, '').slice(0, 28));
         });
       })
       .catch(() => setMicAllowed(false));
@@ -157,10 +104,10 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
 
   if (!isValid || !meta) {
     return (
-      <div className="h-screen bg-[#202124] flex items-center justify-center">
+      <div className="h-screen bg-white flex items-center justify-center">
         <div className="text-center space-y-2">
-          <p className="text-white font-medium">Unknown persona: {rawId}</p>
-          <p className="text-white/40 text-sm">Check the URL and try again.</p>
+          <p className="text-[#202124] font-medium">Unknown persona: {rawId}</p>
+          <p className="text-[#5f6368] text-sm">Check the URL and try again.</p>
         </div>
       </div>
     );
@@ -170,100 +117,191 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
     return <CallStage callId={callId} personaId={personaId} onEnd={() => setCallId(null)} />;
   }
 
-  const initials = meta.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2);
+  const effectivelyMuted = micMuted || micAllowed === false;
+  const showActivity = micAllowed === true && !micMuted && micLevel > 0.06;
 
   return (
-    /* Full-screen dark layout — no floating card on beige */
-    <div className="h-screen bg-[#202124] flex overflow-hidden">
+    <div className="min-h-screen bg-white flex flex-col">
 
-      {/* Left — camera preview, fills all remaining space */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <AudioPreview micAllowed={micAllowed} micLevel={micLevel} />
-      </div>
-
-      {/* Right — white sidebar, fixed width, full height */}
-      <div className="w-[340px] shrink-0 bg-white flex flex-col overflow-y-auto">
-
-        {/* Atlas wordmark */}
-        <div className="px-8 pt-8 pb-2">
-          <span className="text-[11px] font-bold tracking-[0.12em] uppercase text-fg-muted/60">Atlas</span>
+      {/* Top bar — Atlas wordmark left, mode indicator right */}
+      <header className="flex items-center justify-between px-6 py-4 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: meta.color }}>
+            <span className="text-white text-xs font-bold">A</span>
+          </div>
+          <span className="text-[#202124] text-[20px] font-medium tracking-tight">Atlas</span>
         </div>
+        <div className="flex items-center gap-2.5 text-[#5f6368] text-[13px]">
+          <span className="hidden sm:inline">Practice mode</span>
+          <div className="w-8 h-8 rounded-full bg-[#e8eaed] flex items-center justify-center text-[12px] font-medium text-[#5f6368]">
+            ZM
+          </div>
+        </div>
+      </header>
 
-        {/* Persona identity */}
-        <div className="px-8 pt-6 pb-8 flex-1 flex flex-col">
-          <div className="mb-8">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-fg-muted mb-2">
+      {/* Main — centered content */}
+      <main className="flex-1 flex items-center justify-center px-6 py-4 min-h-0">
+        <div className="w-full max-w-[1100px] flex flex-col lg:flex-row gap-8 lg:gap-12 items-center justify-center">
+
+          {/* Camera tile + device pills */}
+          <div className="w-full max-w-[640px] flex flex-col items-center">
+
+            {/* The dark camera tile — 16:9 */}
+            <div className="w-full aspect-video relative rounded-2xl bg-[#202124] overflow-hidden">
+
+              {/* Name chip top-left (Meet convention) */}
+              <div className="absolute top-4 left-4 z-10">
+                <span className="text-white text-[14px] font-normal">You</span>
+              </div>
+
+              {/* More menu top-right */}
+              <button
+                className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"
+                aria-label="More options"
+              >
+                <MoreIcon className="w-5 h-5 text-white" />
+              </button>
+
+              {/* Center — avatar circle (camera placeholder since audio-only) */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="relative">
+                  <div
+                    className="absolute inset-[-8px] rounded-full transition-all duration-100 pointer-events-none"
+                    style={{
+                      boxShadow: showActivity
+                        ? `0 0 0 ${Math.round(micLevel * 18 + 4)}px rgba(255,255,255,0.10)`
+                        : 'none',
+                    }}
+                  />
+                  <div className="w-[88px] h-[88px] rounded-full bg-[#3c4043] flex items-center justify-center">
+                    <span className="text-white/90 text-[36px] font-medium tracking-tight">Z</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom centered controls — circular outlined Meet-style */}
+              <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-3">
+                <button
+                  onClick={() => setMicMuted(m => !m)}
+                  disabled={micAllowed === false}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                    effectivelyMuted
+                      ? 'bg-[#ea4335] hover:bg-[#d33b2c]'
+                      : 'bg-transparent border border-white/30 hover:bg-white/10'
+                  } ${micAllowed === false ? 'cursor-not-allowed opacity-90' : ''}`}
+                  aria-label={effectivelyMuted ? 'Unmute' : 'Mute'}
+                >
+                  {effectivelyMuted
+                    ? <MicMutedIcon className="w-5 h-5 text-white" />
+                    : <MicIcon className="w-5 h-5 text-white" />
+                  }
+                </button>
+              </div>
+
+              {/* Mic blocked overlay */}
+              {micAllowed === false && (
+                <div className="absolute bottom-5 right-5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/60 backdrop-blur-sm">
+                  <MicMutedIcon className="w-3.5 h-3.5 text-[#f28b82]" />
+                  <span className="text-[#f28b82] text-[12px]">Mic blocked</span>
+                </div>
+              )}
+            </div>
+
+            {/* Device selector pills — below the tile, Meet style */}
+            <div className="mt-5 flex items-center gap-2 flex-wrap justify-center">
+              <DevicePill
+                icon={<MicIcon className="w-4 h-4" />}
+                label={micAllowed === false ? 'Microphone blocked' : micLabel}
+                blocked={micAllowed === false}
+              />
+            </div>
+
+            {/* Check link */}
+            {micAllowed === true && (
+              <button className="mt-3 text-[#0b57d0] text-[13px] font-medium hover:underline">
+                Check your audio
+              </button>
+            )}
+          </div>
+
+          {/* Right column — meeting info, no sidebar panel */}
+          <div className="w-full max-w-[360px] flex flex-col items-center text-center">
+
+            <p className="text-[#5f6368] text-[13px] font-medium uppercase tracking-wider mb-2">
               Practice call
             </p>
-            <h1 className="text-[28px] font-semibold text-fg-primary leading-tight tracking-tight">
-              {meta.name}
+            <h1 className="text-[#202124] text-[28px] font-normal leading-[1.2] tracking-tight mb-1">
+              with {meta.name}
             </h1>
-            <p className="text-fg-secondary text-[14px] mt-1">{meta.role} · {meta.org}</p>
+            <p className="text-[#5f6368] text-[14px] mb-8">
+              {meta.role} · {meta.org}
+            </p>
+
+            {/* Atlas suggestion pill — Meet uses this style for Gemini */}
+            <div className="w-full bg-[#e8f0fe] rounded-full px-4 py-3 flex items-center gap-3 mb-6">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: meta.color }}>
+                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6z"/>
+                </svg>
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-[#202124] text-[13px] font-medium leading-tight">Atlas is on the line</p>
+                <p className="text-[#5f6368] text-[12px] leading-tight">Real-time coaching during the call</p>
+              </div>
+            </div>
+
+            {/* Join button — Meet-style pill */}
+            <button
+              onClick={startCall}
+              className="w-full py-3 rounded-full text-white font-medium text-[14px] tracking-wide transition-all hover:shadow-md active:scale-[0.98]"
+              style={{ backgroundColor: meta.color }}
+            >
+              Join now
+            </button>
+
+            {/* Other ways to join */}
+            <button className="w-full mt-3 py-3 rounded-full border border-[#dadce0] text-[#0b57d0] font-medium text-[14px] hover:bg-[#f8f9fa] transition-colors flex items-center justify-center gap-2">
+              <span>Other ways to join</span>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+
+            <p className="mt-6 text-[#5f6368] text-[12px]">
+              Microphone required · audio only
+            </p>
           </div>
+        </div>
+      </main>
 
-          {/* Participant card */}
-          <div className="rounded-xl border border-[#E7E5E4] bg-[#FAFAF9] overflow-hidden mb-4">
-            {/* Persona row */}
-            <div className="flex items-center gap-3 px-4 py-3.5">
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
-                style={{ backgroundColor: meta.color }}
-              >
-                {initials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-fg-primary truncate">{meta.name}</p>
-                <p className="text-[12px] text-fg-muted truncate">{meta.org}</p>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                <span className="text-[11px] text-fg-muted font-medium">Ready</span>
-              </div>
-            </div>
-
-            <div className="mx-4 h-px bg-[#E7E5E4]" />
-
-            {/* Atlas badge */}
-            <div className="flex items-center gap-2.5 px-4 py-3">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent animate-atlas-pulse shrink-0" />
-              <span className="text-[12px] text-fg-secondary leading-snug">
-                Atlas is live — coaching you in real time
-              </span>
-            </div>
+      {/* Footer disclaimer */}
+      <footer className="px-6 py-4 shrink-0">
+        <div className="max-w-3xl mx-auto flex items-start gap-3">
+          <div className="w-5 h-5 rounded-full shrink-0 mt-0.5 flex items-center justify-center" style={{ backgroundColor: meta.color }}>
+            <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6z"/>
+            </svg>
           </div>
-
-          {/* Mic warning — only when blocked */}
-          {micAllowed === false && (
-            <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-amber-50 border border-amber-200/80 mb-4">
-              <svg className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <p className="text-[12px] text-amber-700 leading-snug">
-                Microphone access needed. Allow it in your browser settings, then refresh.
-              </p>
-            </div>
-          )}
-
-          <div className="flex-1" />
-
-          {/* Join button */}
-          <button
-            onClick={startCall}
-            className="w-full py-3.5 rounded-xl font-semibold text-[14px] text-white transition-opacity hover:opacity-90 active:opacity-80"
-            style={{
-              backgroundColor: meta.color,
-              boxShadow: `0 2px 16px ${meta.color}50`,
-            }}
-          >
-            Join now
-          </button>
-
-          <p className="text-center text-[11px] text-fg-muted mt-3">
-            Microphone required · audio only
+          <p className="text-[#5f6368] text-[12px] leading-relaxed">
+            Atlas listens to the call audio and provides real-time coaching suggestions to the rep only.
+            The persona is an AI. No recording is stored after the call ends.
           </p>
         </div>
-      </div>
+      </footer>
     </div>
+  );
+}
+
+function DevicePill({ icon, label, blocked }: { icon: React.ReactNode; label: string; blocked?: boolean }) {
+  return (
+    <button
+      className={`flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full border transition-colors ${
+        blocked
+          ? 'border-[#fce8e6] bg-[#fce8e6] text-[#c5221f]'
+          : 'border-[#dadce0] bg-white hover:bg-[#f8f9fa] text-[#3c4043]'
+      }`}
+    >
+      <span className={blocked ? 'text-[#c5221f]' : 'text-[#5f6368]'}>{icon}</span>
+      <span className="text-[13px] font-medium max-w-[180px] truncate">{label}</span>
+      <ChevronDown className="w-3 h-3 opacity-60" />
+    </button>
   );
 }
