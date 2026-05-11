@@ -37,11 +37,11 @@ export const SuggestionSchema = z.object({
   shouldFire: z.boolean(),
   priority: z.enum(['critical', 'nudge', 'fyi']),
   play: SuggestionPlaySchema,
-  axis: AnchorAxisSchema.nullable(),
-  markdown: z.string(),
+  axis: AnchorAxisSchema.nullable().optional(),
+  markdown: z.string().default(''),
   reasoning: z.string(),
   groundedInUtteranceIds: z.array(z.string()),
-  groundedInAnchorTurnIds: z.array(z.string()),
+  groundedInAnchorTurnIds: z.array(z.string()).default([]),
 });
 export type Suggestion = z.infer<typeof SuggestionSchema>;
 
