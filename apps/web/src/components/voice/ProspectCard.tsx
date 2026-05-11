@@ -5,6 +5,8 @@ import type { PersonaId, Contact } from '@atlas/types';
 const PERSONA_TO_LEAD: Record<PersonaId, string> = {
   jordan: 'jordan-hayes',
   mia: 'mia-chen',
+  pastor: 'pastor-marcus-webb',
+  'vp-sales': 'cass-rivera',
 };
 
 const ROLE_LABEL: Record<Contact['role'], string> = {

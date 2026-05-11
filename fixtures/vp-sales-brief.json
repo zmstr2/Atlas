@@ -1,0 +1,42 @@
+{
+  "lead": {
+    "name": "Cass Rivera",
+    "title": "VP of Sales",
+    "company": "Forge Analytics",
+    "companySize": "60 employees, Series A"
+  },
+  "avaContext": {
+    "campaignId": "campaign-revops-09",
+    "leadScore": 0.74,
+    "scoringSignals": [
+      { "signal": "VP Sales at Series A startup", "weight": 0.30 },
+      { "signal": "Hiring 4 AEs per Greenhouse postings", "weight": 0.25 },
+      { "signal": "Forge raised $18M Series A in Q1", "weight": 0.20 },
+      { "signal": "Posted about rep ramp time on LinkedIn", "weight": 0.15 },
+      { "signal": "Engaged with onboarding-focused content", "weight": 0.10 }
+    ]
+  },
+  "pastInteractions": [
+    {
+      "type": "email",
+      "date": "2026-04-20",
+      "summary": "Cold outbound referencing Cass's LinkedIn post about ramp time. Cass replied with one line: 'Send me the case study, not the pitch.'"
+    },
+    {
+      "type": "email",
+      "date": "2026-04-23",
+      "summary": "Sent the Forge-adjacent case study. Cass clicked through and booked the call."
+    }
+  ],
+  "callGoal": "qualify",
+  "suggestedQuestions": [
+    "You said ramp time was the issue — what does your current onboarding actually look like, and where does it break?",
+    "Walk me through the last AE you ramped. What worked, what didn't, what would you do differently?",
+    "What does success look like for the four AEs you're hiring — and what's your honest read on whether you'll get there with your current playbook?"
+  ],
+  "productSnippets": [
+    "Atlas coaches reps live during calls, so they ramp on real conversations instead of role-plays.",
+    "Customers at your size — Series A, 4-10 AEs — typically cut ramp time from 6 months to 10 weeks within a quarter.",
+    "Native Salesforce sync + webhook architecture. Plugs into your existing stack, doesn't replace it."
+  ]
+}

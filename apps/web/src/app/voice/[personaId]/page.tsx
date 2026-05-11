@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { nanoid } from 'nanoid';
 import posthog from 'posthog-js';
 import type { PersonaId } from '@atlas/types';
 import { CallStage } from '@/components/voice/CallStage';
-
-const VALID_PERSONA_IDS: PersonaId[] = ['jordan', 'mia', 'pastor', 'vp-sales'];
 
 const PERSONA_META: Record<PersonaId, { name: string; role: string; org: string; color: string }> = {
   jordan: { name: 'Jordan Hayes', role: 'VP Marketing', org: 'MidCo', color: '#0ea5e9' },
@@ -48,65 +46,84 @@ function MoreIcon({ className }: { className?: string }) {
 }
 
 export default function VoicePersonaPage({ params }: { params: { personaId: string } }) {
-  const { personaId: rawId } = params;
-  const personaId = rawId as PersonaId;
-  const isValid = VALID_PERSONA_IDS.includes(personaId);
-  const meta = isValid ? PERSONA_META[personaId] : null;
+  const personaId = params.personaId as PersonaId;
+  const meta = PERSONA_META[personaId] as typeof PERSONA_META[PersonaId] | undefined;
 
   const [callId, setCallId] = useState<string | null>(null);
   const [micAllowed, setMicAllowed] = useState<boolean | null>(null);
   const [micMuted, setMicMuted] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const [micLabel, setMicLabel] = useState('Default microphone');
-  const animFrameRef = useRef<number | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+
+  const isValid = Boolean(meta);
 
   useEffect(() => {
-    if (!isValid) return;
+    if (!isValid || callId) return;
     let ctx: AudioContext | null = null;
+    let stream: MediaStream | null = null;
+    let animFrame: number | null = null;
+    let cancelled = false;
 
     navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(stream => {
-        streamRef.current = stream;
+      .then(mediaStream => {
+        if (cancelled) {
+          mediaStream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        stream = mediaStream;
         setMicAllowed(true);
-        ctx = new AudioContext();
-        const source = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        const tick = () => {
-          analyser.getByteFrequencyData(data);
-          const avg = data.slice(0, 32).reduce((a, b) => a + b, 0) / 32;
-          setMicLevel(avg / 128);
-          animFrameRef.current = requestAnimationFrame(tick);
-        };
-        tick();
-        navigator.mediaDevices.enumerateDevices().then(devices => {
-          const mic = devices.find(d => d.kind === 'audioinput');
-          if (mic?.label) setMicLabel(mic.label.replace(/\s*\(.*\)/, '').slice(0, 28));
-        });
+        try {
+          ctx = new AudioContext();
+          const source = ctx.createMediaStreamSource(mediaStream);
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 256;
+          source.connect(analyser);
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          const tick = () => {
+            analyser.getByteFrequencyData(data);
+            const avg = data.slice(0, 32).reduce((a, b) => a + b, 0) / 32;
+            setMicLevel(avg / 128);
+            animFrame = requestAnimationFrame(tick);
+          };
+          tick();
+        } catch (audioErr) {
+          console.warn('[voice] AudioContext setup failed; mic level meter disabled', audioErr);
+        }
+        navigator.mediaDevices.enumerateDevices()
+          .then(devices => {
+            const mic = devices.find(d => d.kind === 'audioinput');
+            if (mic?.label) setMicLabel(mic.label.replace(/\s*\(.*\)/, '').slice(0, 28));
+          })
+          .catch(err => console.warn('[voice] enumerateDevices failed', err));
       })
-      .catch(() => setMicAllowed(false));
+      .catch((err: unknown) => {
+        const isDenied = err instanceof DOMException &&
+          (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
+        if (!isDenied) {
+          console.error('[voice] getUserMedia failed unexpectedly', err);
+        }
+        setMicAllowed(false);
+      });
 
     return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      streamRef.current?.getTracks().forEach(t => t.stop());
-      ctx?.close().catch(() => {});
+      cancelled = true;
+      if (animFrame !== null) cancelAnimationFrame(animFrame);
+      stream?.getTracks().forEach(t => t.stop());
+      ctx?.close().catch(err => console.warn('[voice] AudioContext.close() failed', err));
     };
-  }, [isValid]);
+  }, [isValid, callId]);
 
-  const startCall = () => {
+  function startCall() {
     const id = `call_${nanoid(10)}`;
     posthog.capture('call_started', { call_id: id, persona_id: personaId });
     setCallId(id);
-  };
+  }
 
-  if (!isValid || !meta) {
+  if (!meta) {
     return (
       <div className="h-screen bg-white flex items-center justify-center">
         <div className="text-center space-y-2">
-          <p className="text-[#202124] font-medium">Unknown persona: {rawId}</p>
+          <p className="text-[#202124] font-medium">Unknown persona: {params.personaId}</p>
           <p className="text-[#5f6368] text-sm">Check the URL and try again.</p>
         </div>
       </div>

@@ -1,0 +1,37 @@
+{
+  "lead": {
+    "name": "Pastor Marcus Webb",
+    "title": "Lead Pastor",
+    "company": "Cornerstone Church",
+    "companySize": "~800 weekend attendance"
+  },
+  "avaContext": {
+    "campaignId": "campaign-faith-01",
+    "leadScore": 0.48,
+    "scoringSignals": [
+      { "signal": "Mid-sized congregation (500-1000 attendance)", "weight": 0.30 },
+      { "signal": "Recent capital campaign signal", "weight": 0.20 },
+      { "signal": "Engaged with leadership content on LinkedIn", "weight": 0.20 },
+      { "signal": "Nashville-area church (growth market)", "weight": 0.15 },
+      { "signal": "Opened cold outreach twice", "weight": 0.15 }
+    ]
+  },
+  "pastInteractions": [
+    {
+      "type": "email",
+      "date": "2026-04-18",
+      "summary": "Cold outbound positioning Atlas for member-engagement workflows. Marcus opened the email but didn't reply."
+    }
+  ],
+  "callGoal": "qualify",
+  "suggestedQuestions": [
+    "What's the moment in a member's first year where you lose people, and what have you tried to fix it?",
+    "When you think about discipleship at scale, what feels most broken in your current process?",
+    "How are you tracking who's actually engaged versus who's just attending on Sunday?"
+  ],
+  "productSnippets": [
+    "Atlas can sit alongside Planning Center or Breeze without replacing them — it surfaces the at-risk members your staff would otherwise miss.",
+    "Mid-sized churches typically see 25-40% improvement in first-year retention within two quarters of deployment.",
+    "No professional services needed — pastoral staff can configure the workflows themselves in a few hours."
+  ]
+}

@@ -1,4 +1,5 @@
 import type { PersonaConfig, PersonaId } from '@atlas/types';
+import { lookupLead } from '@atlas/types';
 
 const JORDAN_PROMPT = `You are Jordan Hayes, VP of Marketing at MidCo, a 130-person B2B SaaS company (workflow automation) that closed a $24M Series B with Index Ventures in January 2026.
 
@@ -474,6 +475,12 @@ export const PERSONAS: Record<PersonaId, PersonaConfig> = {
     orbColor: '#ef4444',
   },
 };
+
+for (const config of Object.values(PERSONAS)) {
+  if (lookupLead(config.leadId) === null) {
+    throw new Error(`Persona '${config.id}' references unknown leadId '${config.leadId}'`);
+  }
+}
 
 export function getPersona(id: PersonaId): PersonaConfig {
   return PERSONAS[id];
