@@ -1,6 +1,6 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject, streamObject, type LanguageModel } from 'ai';
-import type { ZodType } from 'zod';
+import { ZodError, type ZodType } from 'zod';
 
 // Permissive provider options — narrowed at call sites by AI SDK's SharedV3ProviderOptions.
 type ProviderOptionsLite = Record<string, Record<string, string | number | boolean>>;
@@ -206,11 +206,19 @@ async function callOpenRouterDirect<T>(opts: {
     raw = JSON.parse(m[0]);
   }
 
-  return {
-    object: opts.schema.parse(raw),
-    promptTokens,
-    completionTokens,
-  };
+  try {
+    return {
+      object: opts.schema.parse(raw),
+      promptTokens,
+      completionTokens,
+    };
+  } catch (err) {
+    if (err instanceof ZodError) {
+      const fields = err.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
+      throw new Error(`LLM schema mismatch — ${fields}`);
+    }
+    throw err;
+  }
 }
 
 export async function llmGenerateObject<T>(opts: {
