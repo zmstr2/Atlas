@@ -133,8 +133,10 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
         </div>
         <div className="flex items-center gap-2.5 text-[#5f6368] text-[13px]">
           <span className="hidden sm:inline">Practice mode</span>
-          <div className="w-8 h-8 rounded-full bg-[#e8eaed] flex items-center justify-center text-[12px] font-medium text-[#5f6368]">
-            ZM
+          <div className="w-8 h-8 rounded-full bg-[#e8eaed] flex items-center justify-center text-[#5f6368]">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+            </svg>
           </div>
         </div>
       </header>
@@ -228,7 +230,7 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
           <div className="w-full max-w-[360px] flex flex-col items-center text-center">
 
             <p className="text-[#5f6368] text-[13px] font-medium uppercase tracking-wider mb-2">
-              Practice call
+              Demo Call
             </p>
             <h1 className="text-[#202124] text-[28px] font-normal leading-[1.2] tracking-tight mb-1">
               with {meta.name}
@@ -244,10 +246,7 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
                   <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6z"/>
                 </svg>
               </div>
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-[#202124] text-[13px] font-medium leading-tight">Atlas is on the line</p>
-                <p className="text-[#5f6368] text-[12px] leading-tight">Real-time coaching during the call</p>
-              </div>
+              <p className="text-[#202124] text-[13px] font-medium leading-tight">Atlas is on the line to coach you</p>
             </div>
 
             {/* Join button — Meet-style pill */}
@@ -259,12 +258,6 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
               Join now
             </button>
 
-            {/* Other ways to join */}
-            <button className="w-full mt-3 py-3 rounded-full border border-[#dadce0] text-[#0b57d0] font-medium text-[14px] hover:bg-[#f8f9fa] transition-colors flex items-center justify-center gap-2">
-              <span>Other ways to join</span>
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-
             <p className="mt-6 text-[#5f6368] text-[12px]">
               Microphone required · audio only
             </p>
@@ -273,18 +266,10 @@ export default function VoicePersonaPage({ params }: { params: { personaId: stri
       </main>
 
       {/* Footer disclaimer */}
-      <footer className="px-6 py-4 shrink-0">
-        <div className="max-w-3xl mx-auto flex items-start gap-3">
-          <div className="w-5 h-5 rounded-full shrink-0 mt-0.5 flex items-center justify-center" style={{ backgroundColor: meta.color }}>
-            <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6z"/>
-            </svg>
-          </div>
-          <p className="text-[#5f6368] text-[12px] leading-relaxed">
-            Atlas listens to the call audio and provides real-time coaching suggestions to the rep only.
-            The persona is an AI. No recording is stored after the call ends.
-          </p>
-        </div>
+      <footer className="px-6 py-4 shrink-0 text-center">
+        <p className="text-[#5f6368] text-[12px]">
+          Atlas coaches the rep only · The persona is an AI · No recordings stored
+        </p>
       </footer>
     </div>
   );
