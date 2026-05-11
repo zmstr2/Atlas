@@ -143,6 +143,53 @@ const COMPANIES: readonly Company[] = [
       { id: 'sam-park', name: 'Sam Park', title: 'Cofounder & Head of Design', role: 'economic_buyer', notes: 'Design-led cofounder, ex-Stripe dashboard team. Skeptical of accelerators — thinks Drift is past the right stage. Mia will not move without him.' },
     ],
   },
+  {
+    id: 'cornerstone',
+    name: 'Cornerstone Church',
+    domain: 'cornerstonechurch.org',
+    industry: 'Religious non-profit — multi-site evangelical church',
+    employees: '20 (staff) + 200 volunteers',
+    techStack: ['Planning Center', 'Breeze', 'Pushpay', 'Mailchimp', 'GroupMe'],
+    recentActivity: [
+      { date: '2026-03-15', summary: 'Launched second campus in Brentwood — stretched staff thin.' },
+      { date: '2026-02-01', summary: 'Elder board asked for dashboard showing growth metrics and visitor follow-up rates.' },
+      { date: '2026-01-10', summary: 'Volunteer coordinator flagged that no-show rates have risen to ~18% — coordination running on GroupMe threads.' },
+    ],
+    fitSignals: [
+      'Multi-site — coordination pain scales with campuses',
+      'No integrated communication layer (3 siloed systems)',
+      'Elder board pressure = internal champion with urgency',
+      'Giving platform not synced to member database',
+    ],
+    contacts: [
+      { id: 'pastor-marcus-webb', name: 'Pastor Marcus Webb', title: 'Lead Pastor', role: 'champion', notes: 'Vision-setter, relationship-first. Skeptical of anything that feels impersonal. Carl (Exec Pastor) handles ops but Marcus controls strategic buyin.' },
+      { id: 'carl-bishop', name: 'Carl Bishop', title: 'Executive Pastor', role: 'economic_buyer', notes: 'Operations lead, owns vendor relationships and budget. Wants a unified dashboard and is the real decision-maker on software.' },
+    ],
+  },
+  {
+    id: 'forge-analytics',
+    name: 'Forge Analytics',
+    domain: 'forgeanalytics.io',
+    industry: 'B2B SaaS — sales intelligence & account scoring',
+    employees: '50-150',
+    fundingStage: 'Series A ($12M, Nov 2025)',
+    techStack: ['Salesforce', 'Gong', 'Outreach', 'LinkedIn Sales Navigator', 'Apollo'],
+    recentActivity: [
+      { date: '2026-04-20', summary: 'Q1 board update: ARR at $4M, behind pace for 3x target. Board asked for forecast reliability plan.' },
+      { date: '2026-03-05', summary: 'Hired 4 new AEs — ramp time under pressure, want it under 90 days vs current 5+ months.' },
+      { date: '2026-02-14', summary: 'Top rep (Derek) accepted a recruiter call from Rippling. Cass flagged as key-person risk.' },
+    ],
+    fitSignals: [
+      'Sales efficiency pressure from board — stated pain',
+      'Large AE team (22) = scale for tooling to matter',
+      'Gong already in stack — AI-aware buyer',
+      'Outbound motion + SDRs = Atlas ICP sweet spot',
+    ],
+    contacts: [
+      { id: 'cass-rivera', name: 'Cass Rivera', title: 'VP of Sales', role: 'champion', notes: 'Direct, data-driven. Has been pitched by every sales vendor. Respects specifics and ROI math. Real decision on tooling under $150k ARR — above that she needs the CFO.' },
+      { id: 'derek-walsh-forge', name: 'Derek Walsh', title: 'Senior AE (top rep)', role: 'influencer', notes: 'Carries 35% of the number. Would be a power user. Fielding recruiter calls.' },
+    ],
+  },
 ] as const;
 
 const LEADS: readonly Lead[] = [
@@ -220,6 +267,43 @@ const LEADS: readonly Lead[] = [
       { type: 'email', date: '2026-04-30', summary: 'Cold outreach referencing eval framework thread. Mia replied within an hour.' },
     ],
     notes: 'Pre-seed founder weighing YC ($500K @ ~7%) vs an active Bedrock term sheet ($1.5M @ $10M post). Real decision constraint is cofounder Sam, who is design-led and accelerator-skeptical. Mia will not apply without Sam being convinced — multi-thread early via an alum intro at a comparable stage.',
+  },
+  {
+    id: 'pastor-marcus-webb',
+    name: 'Pastor Marcus Webb',
+    title: 'Lead Pastor',
+    email: 'marcus@cornerstonechurch.org',
+    companyId: 'cornerstone',
+    leadScore: 0.61,
+    scoringSignals: [
+      { signal: 'Multi-site church — coordination pain at scale', weight: 0.30 },
+      { signal: 'Elder board created internal urgency around growth metrics', weight: 0.25 },
+      { signal: 'Three siloed tech systems (Planning Center, Breeze, Pushpay)', weight: 0.25 },
+      { signal: 'Volunteer no-show rate risen to 18%', weight: 0.20 },
+    ],
+    pastInteractions: [
+      { type: 'email', date: '2026-05-01', summary: 'Inbound inquiry via website — Carl Bishop submitted a contact form about communication platforms.' },
+    ],
+    notes: 'Lead Pastor is the vision champion — Carl Bishop (Exec Pastor) is the real economic buyer. Marcus will not commit without Carl, and Carl will not move without Marcus\'s pastoral buy-in. Relationship-first culture: any pitch that sounds too automated or corporate will stall.',
+  },
+  {
+    id: 'cass-rivera',
+    name: 'Cass Rivera',
+    title: 'VP of Sales',
+    email: 'cass@forgeanalytics.io',
+    companyId: 'forge-analytics',
+    leadScore: 0.72,
+    scoringSignals: [
+      { signal: 'Series A board pressure to 3x ARR — stated urgency', weight: 0.35 },
+      { signal: '22 AEs — scale where tooling ROI is real', weight: 0.25 },
+      { signal: 'Ramp time pain (5+ months vs target 90 days)', weight: 0.20 },
+      { signal: 'Gong already in stack — AI tooling comfortable', weight: 0.20 },
+    ],
+    pastInteractions: [
+      { type: 'email', date: '2026-04-28', summary: 'Cold outbound referencing Q1 board miss and hiring pace. Cass opened twice.' },
+      { type: 'email', date: '2026-05-03', summary: 'Follow-up with ROI estimate for ramp time reduction. Cass replied: "send me the math."' },
+    ],
+    notes: 'Sophisticated buyer — has evaluated most major sales tools. Decision authority up to $150k ARR; CFO needed above that. Key unlocks: concrete ramp-time ROI math, peer reference from a comparable-stage sales org, and answer to "how does this interact with Gong and Outreach."',
   },
 ] as const;
 
