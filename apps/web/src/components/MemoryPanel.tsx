@@ -23,56 +23,60 @@ const AXIS_STATE_LABEL: Record<string, string> = {
   confirmed_negative: 'Blocked',
 };
 
-const AXIS_STATE_COLOR: Record<string, string> = {
-  unknown: 'text-fg-muted/60',
-  vague: 'text-fg-muted/60',
-  soft: 'text-qual-need',
-  partial: 'text-qual-need',
-  firm: 'text-signal-positive',
-  confirmed: 'text-signal-positive',
-  confirmed_negative: 'text-signal-negative',
+// Per-state: label color, card background tint, bottom strip color
+const AXIS_STYLE: Record<string, { label: string; bg: string; strip: string }> = {
+  soft:              { label: 'text-qual-need',        bg: 'bg-[#FEF3C7]/60',          strip: 'bg-qual-need/50' },
+  partial:           { label: 'text-qual-need',        bg: 'bg-[#FEF3C7]/60',          strip: 'bg-qual-need/50' },
+  firm:              { label: 'text-signal-positive',  bg: 'bg-[#D1FAE5]/50',          strip: 'bg-signal-positive/60' },
+  confirmed:         { label: 'text-signal-positive',  bg: 'bg-[#D1FAE5]/50',          strip: 'bg-signal-positive/60' },
+  confirmed_negative:{ label: 'text-signal-negative',  bg: 'bg-signal-negative/5',     strip: 'bg-signal-negative/50' },
 };
+const AXIS_STYLE_DEFAULT = { label: 'text-fg-muted/60', bg: 'bg-bg-base/40', strip: '' };
 
-const AXIS_BORDER: Record<string, string> = {
-  unknown: 'border-fg-muted/20 border-dashed',
-  vague: 'border-fg-muted/20 border-dashed',
-  soft: 'border-qual-need/40',
-  partial: 'border-qual-need/40',
-  firm: 'border-signal-positive/50',
-  confirmed: 'border-signal-positive/50',
-  confirmed_negative: 'border-signal-negative/50',
-};
+const AXIS_KEYS = ['need', 'budget', 'authority', 'timeline'] as const;
+type AxisKey = (typeof AXIS_KEYS)[number];
+
+function isPopulated(card: AxisCard): boolean {
+  const state = card.state ?? 'unknown';
+  return state !== 'unknown' && state !== 'vague';
+}
 
 function BantCard({ axisKey, card }: { axisKey: string; card: AxisCard }) {
   const state = card.state ?? 'unknown';
+  const style = AXIS_STYLE[state] ?? AXIS_STYLE_DEFAULT;
+
   return (
     <div
       className={cn(
-        'rounded-md border bg-bg-base/40 px-2.5 py-2 transition-all duration-150 animate-slide-in flex flex-col gap-1',
-        AXIS_BORDER[state] ?? AXIS_BORDER.unknown,
+        'rounded-md border border-border/50 overflow-hidden transition-all duration-150 animate-slide-in flex flex-col',
+        style.bg,
       )}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-          {AXIS_LABEL[axisKey] ?? axisKey}
-        </span>
-        <span className={cn('text-[10px] font-medium', AXIS_STATE_COLOR[state] ?? AXIS_STATE_COLOR.unknown)}>
-          {AXIS_STATE_LABEL[state] ?? AXIS_STATE_LABEL.unknown}
-        </span>
-      </div>
-      {card.headline ? (
-        <>
-          <div className="text-[12px] text-fg-primary font-medium leading-snug">
-            {card.headline}
-          </div>
-          {card.detail && (
-            <div className="text-[11px] text-fg-muted leading-snug">
-              {card.detail}
+      <div className="px-2.5 pt-2 pb-2.5 flex flex-col gap-1 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-secondary">
+            {AXIS_LABEL[axisKey] ?? axisKey}
+          </span>
+          <span className={cn('text-[10px] font-medium shrink-0', style.label)}>
+            {AXIS_STATE_LABEL[state] ?? AXIS_STATE_LABEL.unknown}
+          </span>
+        </div>
+        {card.headline && (
+          <>
+            <div className="text-[12px] text-fg-primary font-medium leading-snug">
+              {card.headline}
             </div>
-          )}
-        </>
-      ) : (
-        <div className="text-[11px] text-fg-muted/70 leading-snug">—</div>
+            {card.detail && (
+              <div className="text-[11px] text-fg-muted leading-snug">
+                {card.detail}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {/* Bottom strip — only rendered when there's a state to show */}
+      {style.strip && (
+        <div className={cn('h-[3px] w-full', style.strip)} />
       )}
     </div>
   );
@@ -80,30 +84,35 @@ function BantCard({ axisKey, card }: { axisKey: string; card: AxisCard }) {
 
 // ─── Relevant Facts ───────────────────────────────────────────────────────────
 
-const FACT_CATEGORY_ICON: Record<RelevantFact['category'], string> = {
-  stack: '⬡',
-  metric: '#',
-  trigger: '↯',
-  competitor: '⊕',
-  commitment: '✓',
-  process: '→',
+const FACT_CATEGORY_LABEL: Record<RelevantFact['category'], string> = {
+  stack: 'Stack',
+  metric: 'Metric',
+  trigger: 'Trigger',
+  competitor: 'Competitor',
+  commitment: 'Commitment',
+  process: 'Process',
 };
 
 const FACT_CATEGORY_COLOR: Record<RelevantFact['category'], string> = {
-  stack: 'text-blue-500',
-  metric: 'text-signal-positive',
-  trigger: 'text-orange-500',
-  competitor: 'text-qual-need',
-  commitment: 'text-accent',
-  process: 'text-fg-muted',
+  stack: 'bg-blue-500',
+  metric: 'bg-signal-positive',
+  trigger: 'bg-orange-500',
+  competitor: 'bg-qual-need',
+  commitment: 'bg-accent',
+  process: 'bg-fg-muted',
 };
 
 function RelevantFactItem({ fact }: { fact: RelevantFact }) {
   return (
-    <div className="flex items-start gap-2 py-1 animate-slide-in">
-      <span className={cn('text-[11px] shrink-0 mt-0.5 font-mono', FACT_CATEGORY_COLOR[fact.category])}>
-        {FACT_CATEGORY_ICON[fact.category]}
-      </span>
+    <div className="flex items-start gap-2.5 py-1 animate-slide-in">
+      <span
+        className={cn(
+          'shrink-0 mt-[7px] w-1.5 h-1.5 rounded-full',
+          FACT_CATEGORY_COLOR[fact.category],
+        )}
+        title={FACT_CATEGORY_LABEL[fact.category]}
+        aria-label={FACT_CATEGORY_LABEL[fact.category]}
+      />
       <span className="text-[12px] text-fg-secondary leading-snug">{fact.text}</span>
     </div>
   );
@@ -158,19 +167,49 @@ const SENTIMENT_DOT: Record<string, string> = {
   unknown: 'bg-fg-muted/40',
 };
 
-// ─── Open Loops ───────────────────────────────────────────────────────────────
-
 // ─── Section ──────────────────────────────────────────────────────────────────
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  emphasis = false,
+  children,
+}: {
+  title: string;
+  emphasis?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="pt-4 border-t border-border/60 first:pt-0 first:border-t-0">
-      <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
+    <section className="space-y-2">
+      <h3
+        className={cn(
+          'uppercase tracking-[0.14em] text-fg-muted',
+          emphasis ? 'text-[11px] font-bold' : 'text-[10px] font-semibold',
+        )}
+      >
         {title}
       </h3>
       {children}
     </section>
   );
+}
+
+// ─── Fact filter ──────────────────────────────────────────────────────────────
+
+// Suppress facts that restate context already shown in the persona header.
+function filterRedundantFacts(
+  facts: RelevantFact[],
+  redundantPhrases: string[],
+): RelevantFact[] {
+  if (redundantPhrases.length === 0) return facts;
+  const patterns = redundantPhrases
+    .map((p) => p.trim().toLowerCase())
+    .filter((p) => p.length > 3)
+    .map((p) => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`));
+  if (patterns.length === 0) return facts;
+  return facts.filter((f) => {
+    const text = f.text.toLowerCase();
+    return !patterns.some((re) => re.test(text));
+  });
 }
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
@@ -187,10 +226,12 @@ export function MemoryPanel({
   memory,
   factsUI,
   className,
+  redundantPhrases = [],
 }: {
   memory: MeetingMemory | null;
   factsUI?: CallFactsUI | null;
   className?: string;
+  redundantPhrases?: string[];
 }) {
   const baseClass = className ?? 'w-[360px] shrink-0 bg-bg-elevated border-l border-border';
   const isLive = !!factsUI;
@@ -198,33 +239,55 @@ export function MemoryPanel({
   const bant = factsUI?.bant ?? EMPTY_BANT;
   const stakeholders = factsUI?.stakeholders ?? [];
   const openLoops = factsUI?.openLoops ?? [];
-  const relevantFacts = factsUI?.relevantFacts ?? [];
+  const relevantFacts = filterRedundantFacts(
+    factsUI?.relevantFacts ?? [],
+    redundantPhrases,
+  );
   const activeConcerns = (memory?.concerns ?? []).filter((c) => !c.addressed);
   const activeLoops = openLoops.filter((l) => (l as { status?: string }).status !== 'addressed');
+
+  const populatedAxes = AXIS_KEYS.filter((k) => isPopulated(bant[k]));
+  const awaitingAxes = AXIS_KEYS.filter((k) => !isPopulated(bant[k]));
 
   return (
     <aside className={cn(baseClass, 'h-full flex flex-col overflow-hidden')}>
       {/* Sticky header */}
       <div className="sticky top-0 bg-bg-elevated border-b border-border px-4 py-3 z-10 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <span className={cn('w-1.5 h-1.5 rounded-full transition-colors duration-500', isLive ? 'bg-accent animate-atlas-pulse' : 'bg-fg-muted/30')} />
+          <span className={cn('w-1.5 h-1.5 rounded-full transition-colors duration-500', isLive ? 'bg-signal-positive animate-atlas-pulse' : 'bg-fg-muted/30')} />
           <span className="text-sm font-bold tracking-wide text-fg-primary">Live Memory</span>
         </div>
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* Qualification — always first */}
-        <section>
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">
-            Qualification
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {(['need', 'budget', 'authority', 'timeline'] as const).map((k) => (
-              <BantCard key={k} axisKey={k} card={bant[k]} />
-            ))}
-          </div>
-        </section>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        {/* Qualification — always first, slightly emphasized */}
+        <Section title="Qualification" emphasis>
+          {populatedAxes.length === 0 ? (
+            <div className="text-[12px] text-fg-muted/80 leading-snug">
+              Awaiting signal on Need, Budget, Authority, Timeline.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                {populatedAxes.map((k) => (
+                  <BantCard key={k} axisKey={k} card={bant[k]} />
+                ))}
+              </div>
+              {awaitingAxes.length > 0 && (
+                <div className="text-[11px] text-fg-muted leading-snug pt-1">
+                  Awaiting:{' '}
+                  {awaitingAxes.map((k, i) => (
+                    <span key={k}>
+                      {i > 0 && <span className="text-fg-muted/40"> · </span>}
+                      {AXIS_LABEL[k]}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </Section>
 
         {/* Relevant Facts */}
         <Section title="Relevant Facts">
@@ -238,7 +301,7 @@ export function MemoryPanel({
             <div className="space-y-2">
               {[72, 56, 80].map((w) => (
                 <div key={w} className="flex items-center gap-2 py-0.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-fg-muted/10 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-fg-muted/15 shrink-0" />
                   <div className="h-2 rounded-full bg-fg-muted/10" style={{ width: `${w}%` }} />
                 </div>
               ))}
@@ -272,9 +335,9 @@ export function MemoryPanel({
               {activeLoops.map((l) => (
                 <div
                   key={l.id}
-                  className={cn(HOVER_BASE, 'border-l-accent/60 hover:border-l-accent text-sm text-fg-secondary')}
+                  className={cn(HOVER_BASE, 'border-l-qual-need/60 hover:border-l-qual-need text-sm text-fg-secondary')}
                 >
-                  <span className="text-[10px] text-accent font-semibold mr-2 uppercase tracking-wider">
+                  <span className="text-[10px] text-qual-need font-semibold mr-2 uppercase tracking-wider">
                     {l.owner}
                   </span>
                   {l.description}
@@ -284,7 +347,7 @@ export function MemoryPanel({
           ) : (
             <div className="space-y-1.5">
               {[68, 50].map((w) => (
-                <div key={w} className="border-l-2 border-l-accent/15 pl-3 py-1.5">
+                <div key={w} className="border-l-2 border-l-qual-need/15 pl-3 py-1.5">
                   <div className="h-2 rounded-full bg-fg-muted/10" style={{ width: `${w}%` }} />
                 </div>
               ))}

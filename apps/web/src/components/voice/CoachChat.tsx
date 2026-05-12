@@ -53,10 +53,16 @@ export function CoachChat({
 
   return (
     <div className="relative flex flex-col h-full overflow-hidden">
-      {/* Conversation title */}
-      <div className="px-6 py-4 shrink-0">
-        <div className="text-sm font-semibold text-fg-primary">
-          {title ?? 'Atlas'}
+      {/* Conversation title — sized to match the sidebar persona header */}
+      <div className="px-6 py-3 shrink-0 flex items-center gap-2 min-h-[60px]">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-fg-primary truncate leading-snug">
+            {title ?? 'Atlas'}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-fg-muted">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal-positive animate-atlas-pulse shrink-0" aria-hidden="true" />
+            Watching live
+          </div>
         </div>
       </div>
 

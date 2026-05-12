@@ -53,7 +53,9 @@ export function useCoachWS(opts: { callId: string | null; personaId: PersonaId |
       let event: CoachWSServerEvent;
       try {
         event = JSON.parse(msg.data) as CoachWSServerEvent;
-      } catch {
+      } catch (e) {
+        console.error('[CoachWS] Failed to parse server message', { data: msg.data, error: e });
+        setErrors(prev => [...prev, 'Coach sent an unreadable message — connection may be degraded.']);
         return;
       }
       switch (event.type) {
@@ -97,7 +99,11 @@ export function useCoachWS(opts: { callId: string | null; personaId: PersonaId |
           break;
       }
     };
-    ws.onerror = () => setState('error');
+    ws.onerror = (evt) => {
+      console.error('[CoachWS] WebSocket error', evt);
+      setErrors(prev => [...prev, 'Connection to Atlas coach failed.']);
+      setState('error');
+    };
     ws.onclose = () => setState('closed');
 
     return () => {
@@ -108,12 +114,20 @@ export function useCoachWS(opts: { callId: string | null; personaId: PersonaId |
 
   const sendTranscript = useCallback((event: TranscriptEvent) => {
     const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(event));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(event));
+    } else {
+      console.warn('[CoachWS] sendTranscript dropped — socket not open', { readyState: ws?.readyState });
+    }
   }, []);
 
   const sendPersonaToolCall = useCallback((event: PersonaToolCallEvent) => {
     const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(event));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(event));
+    } else {
+      console.warn('[CoachWS] sendPersonaToolCall dropped — socket not open', { readyState: ws?.readyState });
+    }
   }, []);
 
   const endCall = useCallback(() => {
