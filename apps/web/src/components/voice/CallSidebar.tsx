@@ -2,10 +2,8 @@
 import { useState } from 'react';
 
 export type CallSidebarProps = {
-  remoteStream: MediaStream | null;
   displayName: string;
   subtitle?: string;
-  color?: string;
   muted: boolean;
   onToggleMute: () => void;
   onHangup: () => void;
@@ -97,7 +95,7 @@ export function CallSidebar({
         </div>
       )}
 
-      {errors.length > 0 && (
+      {errors.some((e) => e.length > 0) && (
         <div className="px-4 pb-3">
           <CoachErrorNotice errors={errors} />
         </div>

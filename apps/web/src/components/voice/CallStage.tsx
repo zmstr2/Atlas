@@ -198,10 +198,8 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
         <div className="h-full rounded-2xl border border-[#E7E5E4] bg-white shadow-sm overflow-hidden flex flex-col">
           <div className="shrink-0 border-b border-[#E7E5E4]">
             <CallSidebar
-              remoteStream={remoteStream}
               displayName={session?.persona.displayName ?? '...'}
               subtitle={subtitle}
-              color={session?.persona.orbColor}
               muted={muted}
               onToggleMute={toggleMute}
               onHangup={hangup}

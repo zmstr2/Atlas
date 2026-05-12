@@ -136,10 +136,8 @@ export default function MockSidebarPage() {
           {/* CallSidebar */}
           <div className="shrink-0 border-b border-[#E7E5E4]">
             <CallSidebar
-              remoteStream={null}
               displayName="Pastor Marcus Webb"
               subtitle="Lead Pastor, Cornerstone Church"
-              color="#5B3FBE"
               muted={muted}
               onToggleMute={() => setMuted((v) => !v)}
               onHangup={() => alert('End call clicked')}

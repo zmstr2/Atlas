@@ -201,12 +201,14 @@ function filterRedundantFacts(
   redundantPhrases: string[],
 ): RelevantFact[] {
   if (redundantPhrases.length === 0) return facts;
-  const norms = redundantPhrases
+  const patterns = redundantPhrases
     .map((p) => p.trim().toLowerCase())
-    .filter((p) => p.length > 3);
+    .filter((p) => p.length > 3)
+    .map((p) => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`));
+  if (patterns.length === 0) return facts;
   return facts.filter((f) => {
     const text = f.text.toLowerCase();
-    return !norms.some((p) => text.includes(p));
+    return !patterns.some((re) => re.test(text));
   });
 }
 
