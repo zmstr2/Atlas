@@ -33,10 +33,10 @@ const MOCK_FACTS_PARTIAL: CallFactsUI = {
   disqualifiers: { hard: false, softCount: 0, soft: [] },
   stage: { callMinute: 12, talkRatio: { rep: 0.45, prospect: 0.55 }, turnsSinceLastRepQuestion: 2, turnsSinceLastNextStepProposal: 8 },
   relevantFacts: [
-    { id: 'f1', text: 'Newer campus becoming self-sustaining', category: 'trigger' },
-    { id: 'f2', text: 'Tightening path from first-time guest into community', category: 'process' },
-    { id: 'f3', text: 'Cornerstone has two campuses', category: 'stack' },
-    { id: 'f4', text: 'First-year retention is the stated pain', category: 'metric' },
+    { id: 'f1', text: 'Newer campus becoming self-sustaining', category: 'trigger', turnId: 't1' },
+    { id: 'f2', text: 'Tightening path from first-time guest into community', category: 'process', turnId: 't2' },
+    { id: 'f3', text: 'Cornerstone has two campuses', category: 'stack', turnId: 't3' },
+    { id: 'f4', text: 'First-year retention is the stated pain', category: 'metric', turnId: 't4' },
   ],
 };
 
@@ -50,8 +50,8 @@ const MOCK_FACTS_FULL: CallFactsUI = {
   },
   relevantFacts: [
     ...MOCK_FACTS_PARTIAL.relevantFacts,
-    { id: 'f5', text: 'Evaluating Planning Center as an alternative', category: 'competitor' },
-    { id: 'f6', text: 'Committed to follow-up call next Tuesday', category: 'commitment' },
+    { id: 'f5', text: 'Evaluating Planning Center as an alternative', category: 'competitor', turnId: 't5' },
+    { id: 'f6', text: 'Committed to follow-up call next Tuesday', category: 'commitment', turnId: 't6' },
   ],
 };
 
@@ -63,11 +63,24 @@ const MOCK_MEMORY_WITH_CONCERNS: MeetingMemory = {
   facts: [],
   qualSignals: [],
   silenceTopics: [],
-  decisionActors: [],
+  decisionGeography: [],
   openLoops: [],
-  flowEntries: [],
+  flow: [],
   verbatimAnchors: [],
-  scorecard: null,
+  narrative: '',
+  bantRender: {},
+  relevantFacts: [],
+  scorecard: {
+    bant: { need: 'unknown', budget: 'unknown', authority: 'unknown', timeline: 'unknown' },
+    meddic: { metrics: 'unknown', economicBuyer: 'unknown', decisionCriteria: 'unknown', decisionProcess: 'unknown', identifyPain: 'unknown', champion: 'unknown' },
+    pushQueue: [],
+    hardDisqualify: false,
+    softDisqualifySignals: [],
+    talkRatio: { repWords: 0, prospectWords: 0 },
+    turnsSinceLastRepQuestion: 0,
+    turnsSinceLastNextStepProposal: 0,
+    callMinute: 12,
+  },
 };
 
 // ─── Scenario selector ────────────────────────────────────────────────────────
