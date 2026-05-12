@@ -55,6 +55,7 @@ export const SuggestionSchema = z.object({
     (v) => {
       if (typeof v === 'string' && !SuggestionPlaySchema.options.includes(v as any)) {
         coercionCounts.play_unknown++;
+        console.warn('[schema-coercion] play_unknown — model emitted:', v);
         return 'none';
       }
       return v;
@@ -63,8 +64,8 @@ export const SuggestionSchema = z.object({
   ),
   axis: z.preprocess(
     (v) => {
-      if (v === 'none') { coercionCounts.axis_none++; return null; }
-      if (v === '') { coercionCounts.axis_empty++; return null; }
+      if (v === 'none') { coercionCounts.axis_none++; console.warn('[schema-coercion] axis_none'); return null; }
+      if (v === '') { coercionCounts.axis_empty++; console.warn('[schema-coercion] axis_empty'); return null; }
       return v;
     },
     AnchorAxisSchema.nullable().optional()

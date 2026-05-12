@@ -571,6 +571,9 @@ function applyCadenceFloor(
   // markdown field. Applies BEFORE the critical bypass so anchor violations
   // with empty text still get suppressed.
   if (raw.markdown.trim().split(/\s+/).filter(Boolean).length < 5) {
+    console.warn('[suggester] markdown-floor suppressed fire', {
+      play: raw.play, priority: raw.priority, markdown: raw.markdown,
+    });
     return { ...raw, shouldFire: false };
   }
 
@@ -644,10 +647,15 @@ function applyLoadBearingPromotion(
   // Only promote when the model's own evidence links to a load-bearing concern.
   // Without this check, any reframe_objection bypasses cadence as long as ANY
   // load-bearing topic exists in memory, even if the current fire is unrelated.
+  // When groundedInUtteranceIds is empty the model likely omitted the field
+  // (json_object mode default). In that case trust the play choice — the model
+  // picked reframe_objection and load-bearing topics exist.
   const loadBearingUtteranceIds = new Set(
     activeConcerns.filter((c) => loadBearingTopics.has(c.topic)).flatMap((c) => c.utteranceIds),
   );
-  const groundedInLoadBearing = raw.groundedInUtteranceIds.some((id) => loadBearingUtteranceIds.has(id));
+  const groundedInLoadBearing =
+    raw.groundedInUtteranceIds.length === 0 ||
+    raw.groundedInUtteranceIds.some((id) => loadBearingUtteranceIds.has(id));
   if (!groundedInLoadBearing) return raw;
 
   return { ...raw, priority: 'critical' };

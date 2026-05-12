@@ -83,6 +83,10 @@ const BANK: Utt[] = [
 
 // ── Models to test ──────────────────────────────────────────────────────────
 const MODELS = [
+  // Production models — these MUST stay clean. Keep first so regressions are obvious.
+  { label: 'glm-5.1 (off)', orId: 'z-ai/glm-5.1', reasoningOff: true },
+  { label: 'kimi-k2.6 (off)', orId: 'moonshotai/kimi-k2.6', reasoningOff: true },
+  // Baseline / historical comparison
   { label: 'gpt-oss-20b (low)', orId: 'openai/gpt-oss-20b', reasoningEffort: 'low' as const },
   { label: 'gpt-5.4-mini (off)', orId: 'openai/gpt-5.4-mini', reasoningOff: true },
   { label: 'gpt-oss-120b (low)', orId: 'openai/gpt-oss-120b', reasoningEffort: 'low' as const },

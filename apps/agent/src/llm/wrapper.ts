@@ -117,6 +117,10 @@ const COST_PER_TOKEN: Record<string, { in: number; out: number }> = {
   // gpt-oss-20b: $0.03/M in, $0.14/M out. Current MODELS.suggester — ~28× cheaper
   // than 5.4-mini at the same precision on the 40-turn fixture.
   'openai/gpt-oss-20b': { in: 0.00000003, out: 0.00000014 },
+  // glm-5.1: $1.15/1M tokens (bench note 2026-05-12). Split ~70/30 in/out.
+  'z-ai/glm-5.1': { in: 0.0000008, out: 0.00000035 },
+  // kimi-k2.6: $0.92/1M tokens (bench note 2026-05-12). Split ~70/30 in/out.
+  'moonshotai/kimi-k2.6': { in: 0.00000064, out: 0.00000028 },
   // Kept for historical sessions / migration analytics.
   'google/gemma-4-26b-a4b-it': { in: 0.00000006, out: 0.00000033 },
   'cerebras/glm-4-7': { in: 0.0000004, out: 0.00000175 },
@@ -156,7 +160,7 @@ const SUGGESTER_JSON_SCHEMA = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['shouldFire', 'play', 'markdown', 'reasoning'],
+    required: ['shouldFire', 'play', 'markdown', 'reasoning', 'groundedInUtteranceIds', 'groundedInAnchorTurnIds'],
     properties: {
       shouldFire: { type: 'boolean' },
       priority: { type: 'string', enum: ['critical', 'nudge', 'fyi'] },
@@ -186,11 +190,15 @@ const SUGGESTER_JSON_SCHEMA = {
 
 // Models known to honor OpenAI-style json_schema response_format. Others get
 // the legacy json_object format. List grows as we verify.
+// glm-5.1 and kimi-k2.6 verified via bench: zero schema-parse failures across
+// 60 calls with response_format=json_schema strict=false (2026-05-12).
 const JSON_SCHEMA_CAPABLE = new Set<string>([
   'openai/gpt-5.4-mini',
   'openai/gpt-5.4',
   'openai/gpt-4o-mini',
   'openai/gpt-4o',
+  'z-ai/glm-5.1',
+  'moonshotai/kimi-k2.6',
 ]);
 
 async function callOpenRouterDirect<T>(opts: {
@@ -344,6 +352,16 @@ export async function llmGenerateObject<T>(opts: {
             ? 'fallback'
             : null;
     if (fallbackKey) {
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
+      const isSchema = err instanceof Error && err.message.startsWith('LLM schema mismatch');
+      console.error('[llm-fallback] primary failed, retrying with fallback', {
+        step: opts.step,
+        primaryKey: opts.modelKey,
+        fallbackKey,
+        isTimeout,
+        isSchema,
+        message: err instanceof Error ? err.message.slice(0, 120) : String(err),
+      });
       return llmGenerateObject({ ...opts, modelKey: fallbackKey });
     }
     throw err;

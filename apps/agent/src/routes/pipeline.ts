@@ -148,7 +148,9 @@ export async function processUtterance(session: PipelineSession, utterance: Utte
         hotTail: tail,
         prevMemory,
         brief,
-        recentSuggestions: [...matchingRecent],
+        // Slice to last 5 to match the "3 of last 5" cadence rule in the prompt.
+        // The window stores 6 for overlap, but the model should only see 5.
+        recentSuggestions: matchingRecent.slice(-5),
       })
     : utterance.speaker === 'customer'
       ? runProspectSuggester({ utterance, hotTail: tail, prevMemory, brief })
