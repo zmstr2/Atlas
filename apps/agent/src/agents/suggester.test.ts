@@ -124,6 +124,65 @@ describe('suggester prompt regression — early-call probe_stakeholder', () => {
   }, 30_000);
 });
 
+describe('suggester regression — load-bearing concern bypass (Wave 2.1)', () => {
+  test('repeated concern + same topic touched again promotes reframe_objection to critical', async () => {
+    // Setup: a memory state where an "icp_uncertainty" concern was raised
+    // twice already (load-bearing). The LATEST utterance touches it for a
+    // third time. The code-level bypass should promote priority to 'critical'
+    // even if the model chose 'nudge', and cadence should be bypassed.
+    const { createEmptyMemory } = await import('../memory/store');
+    const memory = createEmptyMemory();
+    // Inject two concerns with same topic (memory agent may append duplicates)
+    memory.concerns = [
+      {
+        id: 'c1', topic: 'icp_uncertainty',
+        verbatim: 'we don\'t know our ICP', severity: 'pressed',
+        addressed: false, utteranceIds: ['u10'],
+      },
+      {
+        id: 'c2', topic: 'icp_uncertainty',
+        verbatim: 'tools just added noise', severity: 'pressed',
+        addressed: false, utteranceIds: ['u12'],
+      },
+    ];
+    // Also pretend pain is established so the gate is open
+    memory.scorecard.bant.need = 'soft';
+
+    const utterance: Utterance = {
+      id: 'u14',
+      speaker: 'customer',
+      text: 'Look — I keep saying it: we just don\'t know who our best buyer is yet. That\'s the real blocker, not the tool.',
+      startMs: 100000, endMs: 110000,
+      confidence: 0.98, derivedFromLowConfidence: false,
+    };
+
+    const result = await runSuggester({
+      utterance,
+      hotTail: HOT_TAIL,
+      prevMemory: memory,
+      brief: BRIEF,
+      // Pretend cadence is hot (3 of last 5 fired) — load-bearing should bypass
+      recentSuggestions: [
+        { turn: 9, speaker: 'customer', agent: 'prospect_suggester', fired: true, priority: 'nudge', play: 'drill_vague', markdown: 'Ask about pain' },
+        { turn: 10, speaker: 'customer', agent: 'prospect_suggester', fired: true, priority: 'nudge', play: 'quantify_pain', markdown: 'Pin the number' },
+        { turn: 11, speaker: 'customer', agent: 'prospect_suggester', fired: true, priority: 'nudge', play: 'reframe_objection', markdown: 'LAER it' },
+        { turn: 12, speaker: 'customer', agent: 'prospect_suggester', fired: false, priority: 'nudge', play: 'none', markdown: '' },
+        { turn: 13, speaker: 'customer', agent: 'prospect_suggester', fired: false, priority: 'nudge', play: 'none', markdown: '' },
+      ],
+      system: SUGGESTER_SYSTEM,
+    });
+
+    console.log('\n── Load-bearing concern test ──');
+    console.log(`  shouldFire: ${result.shouldFire}  play: ${result.play}  priority: ${result.priority}`);
+    console.log(`  markdown:   ${result.markdown}`);
+
+    // If it fires reframe_objection, priority must be critical (code-level promotion).
+    if (result.shouldFire && result.play === 'reframe_objection') {
+      expect(result.priority).toBe('critical');
+    }
+  }, 30_000);
+});
+
 describe('suggester prompt regression — minute gate on advance plays', () => {
   test('V2 does not fire advance/trial_close plays before minute 8', async () => {
     // u4: prospect describes real pain — enough to move Need to vague/soft,

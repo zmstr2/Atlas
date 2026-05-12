@@ -87,7 +87,7 @@ Decide whether the rep made a mistake or missed a cue. Output the structured Sug
     schema: SuggestionSchema.omit({ agent: true }),
     prompt,
     system: SYSTEM,
-  });
+  }) as Omit<Suggestion, 'agent'>;
 
   return { ...raw, agent: 'rep_watcher' };
 }

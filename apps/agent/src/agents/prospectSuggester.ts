@@ -121,7 +121,7 @@ Decide whether to fire a suggestion, and if so which play. Output the structured
     schema: SuggestionSchema.omit({ agent: true }),
     prompt,
     system: SYSTEM,
-  });
+  }) as Omit<Suggestion, 'agent'>;
 
   return { ...raw, agent: 'prospect_suggester' };
 }

@@ -21,7 +21,13 @@ export type PipelineSession = {
   snapshotPatchCount: number;
   lastSuggestionTurn: number | null;
   lastSuggestionAgent: 'prospect_suggester' | 'rep_watcher' | null;
-  recentSuggestions: RecentSuggestionEntry[];
+  // Cadence is tracked per channel. A rep-watcher fire shouldn't suppress the
+  // next prospect-suggester decision (and vice versa) — they answer different
+  // questions and shouldn't compete for airtime. See eval-conversation findings
+  // (the cascade where over-fires on rep turns silenced subsequent objection
+  // catches).
+  recentProspectSuggestions: RecentSuggestionEntry[];
+  recentRepSuggestions: RecentSuggestionEntry[];
 };
 
 const RECENT_SUGGESTIONS_WINDOW = 6;
@@ -42,7 +48,8 @@ export function createPipelineSession(callId: string, brief: PreCallBrief): Pipe
     snapshotPatchCount: 0,
     lastSuggestionTurn: null,
     lastSuggestionAgent: null,
-    recentSuggestions: [],
+    recentProspectSuggestions: [],
+    recentRepSuggestions: [],
   };
 
   store.onChange((memory, utteranceId) => {
@@ -89,7 +96,7 @@ function shouldBroadcastSuggestion(session: PipelineSession, s: Suggestion): boo
 }
 
 function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, speaker: 'rep' | 'customer') {
-  session.recentSuggestions.push({
+  const entry: RecentSuggestionEntry = {
     turn: session.turnCounter,
     speaker,
     agent: s.agent,
@@ -97,9 +104,16 @@ function pushRecent(session: PipelineSession, s: Suggestion, fired: boolean, spe
     priority: s.priority,
     play: s.play,
     markdown: s.markdown,
-  });
-  if (session.recentSuggestions.length > RECENT_SUGGESTIONS_WINDOW) {
-    session.recentSuggestions.splice(0, session.recentSuggestions.length - RECENT_SUGGESTIONS_WINDOW);
+  };
+  // Route to the appropriate cadence stream based on which suggester emitted
+  // this. agent='prospect_suggester' → prospect window; 'rep_watcher' → rep
+  // window. Each window is independently capped.
+  const target = s.agent === 'prospect_suggester'
+    ? session.recentProspectSuggestions
+    : session.recentRepSuggestions;
+  target.push(entry);
+  if (target.length > RECENT_SUGGESTIONS_WINDOW) {
+    target.splice(0, target.length - RECENT_SUGGESTIONS_WINDOW);
   }
 }
 
@@ -121,13 +135,22 @@ export async function processUtterance(session: PipelineSession, utterance: Utte
   const turnId = nextTurnId(session);
 
   // Suggester dispatch — split (legacy) vs merged (one agent, self-pacing).
+  // The merged suggester reads only the cadence stream matching the current
+  // speaker — prospect turns see prospect-suggester history; rep turns see
+  // rep-watcher history. This eliminates the cross-channel cascade where a
+  // rep-mistake fire on turn N suppressed an objection catch on turn N+1.
+  const matchingRecent = utterance.speaker === 'customer'
+    ? session.recentProspectSuggestions
+    : session.recentRepSuggestions;
   const suggesterPromise: Promise<Suggestion> = SUGGESTER_MODE === 'merged'
     ? runSuggester({
         utterance,
         hotTail: tail,
         prevMemory,
         brief,
-        recentSuggestions: [...session.recentSuggestions],
+        // Slice to last 5 to match the "3 of last 5" cadence rule in the prompt.
+        // The window stores 6 for overlap, but the model should only see 5.
+        recentSuggestions: matchingRecent.slice(-5),
       })
     : utterance.speaker === 'customer'
       ? runProspectSuggester({ utterance, hotTail: tail, prevMemory, brief })

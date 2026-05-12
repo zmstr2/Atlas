@@ -1,6 +1,21 @@
 import { z } from 'zod';
 import { FlowTagSchema, AnchorAxisSchema, AxisKeySchema, AxisStateSchema, BantRenderEntrySchema } from './memory';
 
+// ---------- Schema coercion telemetry ----------
+// Increment when a Zod preprocessor or default rescues a malformed/missing field
+// from the LLM. High counts here indicate prompt drift — we're silently fixing
+// the model's output. Exposed for periodic logging and the schema-fuzz script.
+type CoercionField = 'play_unknown' | 'axis_none' | 'axis_empty' | 'grounded_ids_coerce';
+const coercionCounts: Record<CoercionField, number> = {
+  play_unknown: 0, axis_none: 0, axis_empty: 0, grounded_ids_coerce: 0,
+};
+export function getCoercionCounts(): Readonly<Record<CoercionField, number>> {
+  return { ...coercionCounts };
+}
+export function resetCoercionCounts(): void {
+  for (const k of Object.keys(coercionCounts) as CoercionField[]) coercionCounts[k] = 0;
+}
+
 // ---------- Suggestion output for prospect-suggester + rep-watcher ----------
 
 export const SuggestionPlaySchema = z.enum([
@@ -35,13 +50,36 @@ export type SuggestionPlay = z.infer<typeof SuggestionPlaySchema>;
 export const SuggestionSchema = z.object({
   agent: z.enum(['prospect_suggester', 'rep_watcher']),
   shouldFire: z.boolean(),
-  priority: z.enum(['critical', 'nudge', 'fyi']),
-  play: SuggestionPlaySchema,
-  axis: AnchorAxisSchema.nullable().optional(),
+  priority: z.enum(['critical', 'nudge', 'fyi']).default('nudge'),
+  play: z.preprocess(
+    (v) => {
+      if (typeof v === 'string' && !SuggestionPlaySchema.options.includes(v as any)) {
+        coercionCounts.play_unknown++;
+        console.warn('[schema-coercion] play_unknown — model emitted:', v);
+        return 'none';
+      }
+      return v;
+    },
+    SuggestionPlaySchema
+  ),
+  axis: z.preprocess(
+    (v) => {
+      if (v === 'none') { coercionCounts.axis_none++; console.warn('[schema-coercion] axis_none'); return null; }
+      if (v === '') { coercionCounts.axis_empty++; console.warn('[schema-coercion] axis_empty'); return null; }
+      return v;
+    },
+    AnchorAxisSchema.nullable().optional()
+  ),
   markdown: z.string().default(''),
-  reasoning: z.string(),
-  groundedInUtteranceIds: z.array(z.string()),
-  groundedInAnchorTurnIds: z.array(z.string()).default([]),
+  reasoning: z.string().default(''),
+  groundedInUtteranceIds: z.array(z.preprocess((v) => {
+    if (typeof v !== 'string') { coercionCounts.grounded_ids_coerce++; return String(v); }
+    return v;
+  }, z.string())).default([]),
+  groundedInAnchorTurnIds: z.array(z.preprocess((v) => {
+    if (typeof v !== 'string') { coercionCounts.grounded_ids_coerce++; return String(v); }
+    return v;
+  }, z.string())).default([]),
 });
 export type Suggestion = z.infer<typeof SuggestionSchema>;
 

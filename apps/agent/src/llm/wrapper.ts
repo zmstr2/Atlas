@@ -35,23 +35,15 @@ export const MODELS = {
   // load. See providerOptionsFor below.
   hotPathFallback: 'openai/gpt-5.4-mini',
   extractor: 'openai/gpt-5.4-mini',
-  // Suggester: prospect-suggester / rep-watcher / merged suggester. Switched
-  // from Gemma (which over-fired — 55% silent precision on the 40-turn fixture)
-  // to gpt-oss-20b at reasoning_effort='low'. bench-suggester-40turn-v3 measured
-  // 80% precision / 80% recall, ~2s p50 latency through OR throughput-sort,
-  // at $0.067/1k calls (Gemma was $0.124 with worse precision). The smaller
-  // recall delta vs gpt-5.4-mini (-10pts) is the right trade for this product
-  // since alert-fatigue from false fires hurts trust more than missed nudges.
-  // Per-token: $0.03/M in, $0.14/M out (OpenRouter).
-  suggester: 'openai/gpt-oss-20b',
-  // Suggester fallback: gpt-5.4-mini with reasoning DISABLED (effort='none' is
-  // the gateway-supported equivalent of OpenRouter's `reasoning.enabled=false`).
-  // Reasoning-off is strictly better than reasoning='low' for this role:
-  // bench-suggester-40turn-v3 showed avg score 3.27→3.42, p95 latency 11.75s→6.08s,
-  // cost $1.89→$1.57/1k. Used as fallback because it covers the rare cases where
-  // gpt-oss-20b under-fires (notably rep_watcher mistakes — 5.4-mini caught
-  // u17/u25 where oss-20b stayed silent). Per-token: $0.75/M in, $4.50/M out.
-  suggesterFallback: 'openai/gpt-5.4-mini',
+  // Suggester: prospect-suggester / rep-watcher / merged suggester.
+  // bench-suggester-multimodel (N=5, 12-turn HireLoop fixture, 2026-05-12):
+  // glm-5.1 F1=0.86, judge=4.25/5, TTFT p50=191ms p95=335ms, TTLT p95=1712ms,
+  // $1.15/1k. Tied-best quality across 10 candidates; fastest by 3-5× on p95.
+  // Reasoning disabled (enabled=false). Zero parse failures across 60 calls.
+  suggester: 'z-ai/glm-5.1',
+  // Suggester fallback: kimi-k2.6 — same F1/judge tier as glm-5.1, reasoning
+  // disabled. Used when glm times out or errors. TTFT p95=1039ms, $0.92/1k.
+  suggesterFallback: 'moonshotai/kimi-k2.6',
   // Post-call synthesis (quality > speed)
   postCall: 'openai/gpt-oss-120b',
   // Post-call fallback only — large prose-friendly model. Not safe for
@@ -92,7 +84,7 @@ function providerOptionsFor(key: ModelKey): ProviderOptionsLite | undefined {
 const OR_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 type OrReasoning = { effort: 'minimal' | 'low' | 'medium' | 'high' } | { enabled: false };
 function reasoningForOpenRouter(key: ModelKey): OrReasoning | undefined {
-  if (key === 'suggester') return { effort: 'low' };
+  if (key === 'suggester') return { enabled: false };
   if (key === 'suggesterFallback') return { enabled: false };
   return undefined;
 }
@@ -110,7 +102,7 @@ function shouldRouteDirect(key: ModelKey): boolean {
 //   - postCall: 20s — quality > speed, ~5-10s typical on oss-120b.
 function timeoutFor(key: ModelKey): number {
   if (key === 'postCall') return 20_000;
-  if (key === 'suggester' || key === 'suggesterFallback') return 8_000;
+  if (key === 'suggester' || key === 'suggesterFallback') return 4_000;
   return 5_000;
 }
 
@@ -125,6 +117,10 @@ const COST_PER_TOKEN: Record<string, { in: number; out: number }> = {
   // gpt-oss-20b: $0.03/M in, $0.14/M out. Current MODELS.suggester — ~28× cheaper
   // than 5.4-mini at the same precision on the 40-turn fixture.
   'openai/gpt-oss-20b': { in: 0.00000003, out: 0.00000014 },
+  // glm-5.1: $1.15/1M tokens (bench note 2026-05-12). Split ~70/30 in/out.
+  'z-ai/glm-5.1': { in: 0.0000008, out: 0.00000035 },
+  // kimi-k2.6: $0.92/1M tokens (bench note 2026-05-12). Split ~70/30 in/out.
+  'moonshotai/kimi-k2.6': { in: 0.00000064, out: 0.00000028 },
   // Kept for historical sessions / migration analytics.
   'google/gemma-4-26b-a4b-it': { in: 0.00000006, out: 0.00000033 },
   'cerebras/glm-4-7': { in: 0.0000004, out: 0.00000175 },
@@ -152,6 +148,59 @@ export function clearCallLog(): void {
 // `{ object, usage }` matching AI SDK's shape so the surrounding wrapper code
 // stays uniform. Throws on HTTP error, parse failure, or schema mismatch — all
 // of which trigger the existing fallback-key chain in llmGenerateObject.
+// Hand-written JSON Schema for SuggestionSchema.omit({ agent: true }). Used in
+// json_schema strict mode where models support it (gpt-5.4-mini definitely;
+// gpt-oss-20b's various OR providers vary — body is sent and ignored if the
+// provider doesn't honor it, falling back to json_object behavior). Kept in
+// sync with packages/types/src/agents.ts manually; the schema-fuzz script
+// (Wave 3.2) will catch drift.
+const SUGGESTER_JSON_SCHEMA = {
+  name: 'Suggestion',
+  strict: false, // strict=true requires `additionalProperties:false` everywhere; relax for now
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['shouldFire', 'play', 'markdown', 'reasoning', 'groundedInUtteranceIds', 'groundedInAnchorTurnIds'],
+    properties: {
+      shouldFire: { type: 'boolean' },
+      priority: { type: 'string', enum: ['critical', 'nudge', 'fyi'] },
+      play: {
+        type: 'string',
+        enum: [
+          'drill_vague', 'quantify_pain', 'probe_stakeholder', 'reframe_objection',
+          'surface_value_prop', 'competitor_handle', 'push_next_axis', 'trial_close',
+          'multi_thread', 'anchor_next_step', 'qualify_out', 'correct_contradiction',
+          'rep_leading_question', 'rep_feature_dump', 'rep_premature_discount',
+          'rep_missed_buying_signal', 'rep_skipped_drill', 'rep_defended_objection',
+          'rep_off_ladder', 'rep_no_next_step', 'rep_pitched_outside_anchor', 'none',
+        ],
+      },
+      axis: {
+        type: ['string', 'null'],
+        enum: ['need', 'budget', 'authority', 'timeline', 'metric', 'champion',
+               'consequence', 'competitor', 'stakeholder', null],
+      },
+      markdown: { type: 'string' },
+      reasoning: { type: 'string' },
+      groundedInUtteranceIds: { type: 'array', items: { type: 'string' } },
+      groundedInAnchorTurnIds: { type: 'array', items: { type: 'string' } },
+    },
+  },
+};
+
+// Models known to honor OpenAI-style json_schema response_format. Others get
+// the legacy json_object format. List grows as we verify.
+// glm-5.1 and kimi-k2.6 verified via bench: zero schema-parse failures across
+// 60 calls with response_format=json_schema strict=false (2026-05-12).
+const JSON_SCHEMA_CAPABLE = new Set<string>([
+  'openai/gpt-5.4-mini',
+  'openai/gpt-5.4',
+  'openai/gpt-4o-mini',
+  'openai/gpt-4o',
+  'z-ai/glm-5.1',
+  'moonshotai/kimi-k2.6',
+]);
+
 async function callOpenRouterDirect<T>(opts: {
   modelId: string;
   schema: ZodType<T>;
@@ -159,10 +208,12 @@ async function callOpenRouterDirect<T>(opts: {
   system?: string;
   reasoning?: OrReasoning;
   signal: AbortSignal;
+  useJsonSchema?: boolean;
 }): Promise<{ object: T; promptTokens: number; completionTokens: number }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not set — required for suggester routing');
 
+  const useSchema = opts.useJsonSchema && JSON_SCHEMA_CAPABLE.has(opts.modelId);
   const body: Record<string, unknown> = {
     model: opts.modelId,
     messages: [
@@ -174,7 +225,9 @@ async function callOpenRouterDirect<T>(opts: {
     ],
     max_tokens: 4000,
     provider: { sort: 'throughput' },
-    response_format: { type: 'json_object' },
+    response_format: useSchema
+      ? { type: 'json_schema', json_schema: SUGGESTER_JSON_SCHEMA }
+      : { type: 'json_object' },
   };
   if (opts.reasoning) body.reasoning = opts.reasoning;
 
@@ -244,6 +297,9 @@ export async function llmGenerateObject<T>(opts: {
         system: opts.system,
         reasoning: reasoningForOpenRouter(opts.modelKey),
         signal: controller.signal,
+        // Suggester paths use json_schema where the model supports it. Falls
+        // back to json_object inside callOpenRouterDirect when not capable.
+        useJsonSchema: opts.modelKey === 'suggester' || opts.modelKey === 'suggesterFallback',
       });
       callLog.push({
         step: opts.step,
@@ -296,6 +352,16 @@ export async function llmGenerateObject<T>(opts: {
             ? 'fallback'
             : null;
     if (fallbackKey) {
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
+      const isSchema = err instanceof Error && err.message.startsWith('LLM schema mismatch');
+      console.error('[llm-fallback] primary failed, retrying with fallback', {
+        step: opts.step,
+        primaryKey: opts.modelKey,
+        fallbackKey,
+        isTimeout,
+        isSchema,
+        message: err instanceof Error ? err.message.slice(0, 120) : String(err),
+      });
       return llmGenerateObject({ ...opts, modelKey: fallbackKey });
     }
     throw err;
