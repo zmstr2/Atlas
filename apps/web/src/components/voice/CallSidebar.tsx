@@ -119,17 +119,17 @@ function IconButton({
 }) {
   const toneClass =
     tone === 'destructive'
-      ? 'text-fg-muted hover:text-signal-negative hover:bg-signal-negative/10'
+      ? 'bg-signal-negative/10 text-signal-negative hover:bg-signal-negative hover:text-white'
       : tone === 'accent'
         ? 'text-accent bg-accent/10 hover:bg-accent/15'
-        : 'text-fg-secondary hover:text-fg-primary hover:bg-bg-subtle';
+        : 'text-fg-secondary bg-bg-subtle hover:text-fg-primary hover:bg-bg-muted';
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`w-8 h-8 flex items-center justify-center rounded-md transition ${toneClass}`}
+      className={`w-8 h-8 flex items-center justify-center rounded-lg transition ${toneClass}`}
     >
       {children}
     </button>

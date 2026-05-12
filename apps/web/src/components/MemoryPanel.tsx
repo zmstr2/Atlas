@@ -23,21 +23,15 @@ const AXIS_STATE_LABEL: Record<string, string> = {
   confirmed_negative: 'Blocked',
 };
 
-const AXIS_STATE_COLOR: Record<string, string> = {
-  soft: 'text-qual-need',
-  partial: 'text-qual-need',
-  firm: 'text-signal-positive',
-  confirmed: 'text-signal-positive',
-  confirmed_negative: 'text-signal-negative',
+// Per-state: label color, card background tint, bottom strip color
+const AXIS_STYLE: Record<string, { label: string; bg: string; strip: string }> = {
+  soft:              { label: 'text-qual-need',        bg: 'bg-[#FEF3C7]/60',          strip: 'bg-qual-need/50' },
+  partial:           { label: 'text-qual-need',        bg: 'bg-[#FEF3C7]/60',          strip: 'bg-qual-need/50' },
+  firm:              { label: 'text-signal-positive',  bg: 'bg-[#D1FAE5]/50',          strip: 'bg-signal-positive/60' },
+  confirmed:         { label: 'text-signal-positive',  bg: 'bg-[#D1FAE5]/50',          strip: 'bg-signal-positive/60' },
+  confirmed_negative:{ label: 'text-signal-negative',  bg: 'bg-signal-negative/5',     strip: 'bg-signal-negative/50' },
 };
-
-const AXIS_BORDER: Record<string, string> = {
-  soft: 'border-qual-need/40',
-  partial: 'border-qual-need/40',
-  firm: 'border-signal-positive/50',
-  confirmed: 'border-signal-positive/50',
-  confirmed_negative: 'border-signal-negative/50',
-};
+const AXIS_STYLE_DEFAULT = { label: 'text-fg-muted/60', bg: 'bg-bg-base/40', strip: '' };
 
 const AXIS_KEYS = ['need', 'budget', 'authority', 'timeline'] as const;
 type AxisKey = (typeof AXIS_KEYS)[number];
@@ -49,32 +43,40 @@ function isPopulated(card: AxisCard): boolean {
 
 function BantCard({ axisKey, card }: { axisKey: string; card: AxisCard }) {
   const state = card.state ?? 'unknown';
+  const style = AXIS_STYLE[state] ?? AXIS_STYLE_DEFAULT;
+
   return (
     <div
       className={cn(
-        'rounded-md border bg-bg-base/40 px-2.5 py-2 transition-all duration-150 animate-slide-in flex flex-col gap-1',
-        AXIS_BORDER[state] ?? 'border-border/60',
+        'rounded-md border border-border/50 overflow-hidden transition-all duration-150 animate-slide-in flex flex-col',
+        style.bg,
       )}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-          {AXIS_LABEL[axisKey] ?? axisKey}
-        </span>
-        <span className={cn('text-[10px] font-medium', AXIS_STATE_COLOR[state] ?? 'text-fg-muted')}>
-          {AXIS_STATE_LABEL[state] ?? AXIS_STATE_LABEL.unknown}
-        </span>
-      </div>
-      {card.headline && (
-        <>
-          <div className="text-[12px] text-fg-primary font-medium leading-snug">
-            {card.headline}
-          </div>
-          {card.detail && (
-            <div className="text-[11px] text-fg-muted leading-snug">
-              {card.detail}
+      <div className="px-2.5 pt-2 pb-2.5 flex flex-col gap-1 flex-1">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+            {AXIS_LABEL[axisKey] ?? axisKey}
+          </span>
+          <span className={cn('text-[10px] font-medium', style.label)}>
+            {AXIS_STATE_LABEL[state] ?? AXIS_STATE_LABEL.unknown}
+          </span>
+        </div>
+        {card.headline && (
+          <>
+            <div className="text-[12px] text-fg-primary font-medium leading-snug">
+              {card.headline}
             </div>
-          )}
-        </>
+            {card.detail && (
+              <div className="text-[11px] text-fg-muted leading-snug">
+                {card.detail}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {/* Bottom strip — only rendered when there's a state to show */}
+      {style.strip && (
+        <div className={cn('h-[3px] w-full', style.strip)} />
       )}
     </div>
   );
