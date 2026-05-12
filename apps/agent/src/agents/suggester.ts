@@ -443,10 +443,13 @@ drill_vague | quantify_pain | probe_stakeholder | reframe_objection | surface_va
 const PROMPT_VERSION = (process.env.SUGGESTER_PROMPT_VERSION ?? 'current') as 'current' | 'v1' | 'v2' | 'v3';
 
 function selectSystemPrompt(): string {
-  if (PROMPT_VERSION === 'v1') return SUGGESTER_SYSTEM_V1;
-  if (PROMPT_VERSION === 'v2') return SUGGESTER_SYSTEM_V2;
-  if (PROMPT_VERSION === 'v3') return SUGGESTER_SYSTEM_V3_1;
-  return SUGGESTER_SYSTEM;
+  const base =
+    PROMPT_VERSION === 'v1' ? SUGGESTER_SYSTEM_V1 :
+    PROMPT_VERSION === 'v2' ? SUGGESTER_SYSTEM_V2 :
+    PROMPT_VERSION === 'v3' ? SUGGESTER_SYSTEM_V3_1 :
+    SUGGESTER_SYSTEM;
+  const augment = process.env.SUGGESTER_AUGMENT;
+  return augment ? `${base}\n\n${augment}` : base;
 }
 
 export function buildSuggesterPrompt(opts: {
@@ -632,8 +635,20 @@ function applyLoadBearingPromotion(
     const n = Math.max(1, c.utteranceIds.length);
     topicCounts.set(c.topic, (topicCounts.get(c.topic) ?? 0) + n);
   }
-  const hasLoadBearing = [...topicCounts.values()].some((n) => n >= 2);
-  if (!hasLoadBearing) return raw;
+
+  const loadBearingTopics = new Set(
+    [...topicCounts.entries()].filter(([, n]) => n >= 2).map(([topic]) => topic),
+  );
+  if (loadBearingTopics.size === 0) return raw;
+
+  // Only promote when the model's own evidence links to a load-bearing concern.
+  // Without this check, any reframe_objection bypasses cadence as long as ANY
+  // load-bearing topic exists in memory, even if the current fire is unrelated.
+  const loadBearingUtteranceIds = new Set(
+    activeConcerns.filter((c) => loadBearingTopics.has(c.topic)).flatMap((c) => c.utteranceIds),
+  );
+  const groundedInLoadBearing = raw.groundedInUtteranceIds.some((id) => loadBearingUtteranceIds.has(id));
+  if (!groundedInLoadBearing) return raw;
 
   return { ...raw, priority: 'critical' };
 }

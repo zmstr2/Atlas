@@ -35,23 +35,15 @@ export const MODELS = {
   // load. See providerOptionsFor below.
   hotPathFallback: 'openai/gpt-5.4-mini',
   extractor: 'openai/gpt-5.4-mini',
-  // Suggester: prospect-suggester / rep-watcher / merged suggester. Switched
-  // from Gemma (which over-fired — 55% silent precision on the 40-turn fixture)
-  // to gpt-oss-20b at reasoning_effort='low'. bench-suggester-40turn-v3 measured
-  // 80% precision / 80% recall, ~2s p50 latency through OR throughput-sort,
-  // at $0.067/1k calls (Gemma was $0.124 with worse precision). The smaller
-  // recall delta vs gpt-5.4-mini (-10pts) is the right trade for this product
-  // since alert-fatigue from false fires hurts trust more than missed nudges.
-  // Per-token: $0.03/M in, $0.14/M out (OpenRouter).
-  suggester: 'openai/gpt-oss-20b',
-  // Suggester fallback: gpt-5.4-mini with reasoning DISABLED (effort='none' is
-  // the gateway-supported equivalent of OpenRouter's `reasoning.enabled=false`).
-  // Reasoning-off is strictly better than reasoning='low' for this role:
-  // bench-suggester-40turn-v3 showed avg score 3.27→3.42, p95 latency 11.75s→6.08s,
-  // cost $1.89→$1.57/1k. Used as fallback because it covers the rare cases where
-  // gpt-oss-20b under-fires (notably rep_watcher mistakes — 5.4-mini caught
-  // u17/u25 where oss-20b stayed silent). Per-token: $0.75/M in, $4.50/M out.
-  suggesterFallback: 'openai/gpt-5.4-mini',
+  // Suggester: prospect-suggester / rep-watcher / merged suggester.
+  // bench-suggester-multimodel (N=5, 12-turn HireLoop fixture, 2026-05-12):
+  // glm-5.1 F1=0.86, judge=4.25/5, TTFT p50=191ms p95=335ms, TTLT p95=1712ms,
+  // $1.15/1k. Tied-best quality across 10 candidates; fastest by 3-5× on p95.
+  // Reasoning disabled (enabled=false). Zero parse failures across 60 calls.
+  suggester: 'z-ai/glm-5.1',
+  // Suggester fallback: kimi-k2.6 — same F1/judge tier as glm-5.1, reasoning
+  // disabled. Used when glm times out or errors. TTFT p95=1039ms, $0.92/1k.
+  suggesterFallback: 'moonshotai/kimi-k2.6',
   // Post-call synthesis (quality > speed)
   postCall: 'openai/gpt-oss-120b',
   // Post-call fallback only — large prose-friendly model. Not safe for
@@ -92,7 +84,7 @@ function providerOptionsFor(key: ModelKey): ProviderOptionsLite | undefined {
 const OR_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 type OrReasoning = { effort: 'minimal' | 'low' | 'medium' | 'high' } | { enabled: false };
 function reasoningForOpenRouter(key: ModelKey): OrReasoning | undefined {
-  if (key === 'suggester') return { effort: 'low' };
+  if (key === 'suggester') return { enabled: false };
   if (key === 'suggesterFallback') return { enabled: false };
   return undefined;
 }
@@ -110,7 +102,7 @@ function shouldRouteDirect(key: ModelKey): boolean {
 //   - postCall: 20s — quality > speed, ~5-10s typical on oss-120b.
 function timeoutFor(key: ModelKey): number {
   if (key === 'postCall') return 20_000;
-  if (key === 'suggester' || key === 'suggesterFallback') return 8_000;
+  if (key === 'suggester' || key === 'suggesterFallback') return 4_000;
   return 5_000;
 }
 
