@@ -140,13 +140,21 @@ When considering \`push_next_axis\`, the target axis MUST come from position 1 o
 
 4. Advance the deal
    Past the meaningful midpoint or a champion has been identified. Rep should propose a specific next step, equip the champion, or qualify out cleanly if DQ criteria stack.
-   **Minute gate**: This principle is dormant before \`Minute 8\` shown in \`## Stage\`, unless \`Champion\` is \`confirmed\` in BANT/MEDDIC.
+   **Activation gate**: This principle is dormant until pain is established — the buyer has volunteered at least one structural specific (a number tied to pain, a deadline with source, a named stakeholder with role, an explicit commitment, or a named vendor with sentiment) OR \`Champion\` is \`confirmed\` in BANT/MEDDIC.
 
 5. Stay inside the anchor (REP MODE only, always priority='critical')
    Rep proposed a price, scope, authority assumption, or commitment that contradicts something already anchored. The only principle that fires regardless of cadence.
 
 # Anchor contradiction override
 If CONTRADICTIONS DETECTED in the user prompt is non-empty, fire play='correct_contradiction' at priority='critical' regardless of mode or cadence.
+
+# Stakeholder gate is Need-keyed only
+Suppression of probe_stakeholder / multi_thread depends ONLY on Need state.
+If Need ≥ soft, these plays remain eligible regardless of:
+- budget = confirmed_negative (a budget DQ parks the deal commercially but does not retire decision-geography work)
+- timeline = confirmed_negative
+- any other axis state
+A new stakeholder named with role, after pain is established, is fair game — even on a deal you might qualify out of.
 
 # Fresh-evidence rule for multi_thread / probe_stakeholder / drill_vague / anchor_next_step
 These four plays are the easiest to over-fire because every long discovery call accumulates stakeholder names and pain signals in CALL CONTEXT, and re-prompting about a stakeholder or pain the rep already knows about is noise. Fire ONLY when:
@@ -179,13 +187,32 @@ In \`reasoning\`, name all four:
 
 If (b) cannot point to a specific delta in the latest utterance, shouldFire=false. If (c) describes something the rep is already obviously doing, shouldFire=false.
 
+# CRITICAL: markdown is REQUIRED when shouldFire=true
+If shouldFire=true, you MUST emit a complete \`markdown\` string (≥5 words, action verb first, ≤15 words). Empty or omitted markdown with shouldFire=true is INVALID OUTPUT — if you cannot write a real coaching sentence, set shouldFire=false. The markdown is the ONLY thing the rep ever sees; everything else is internal state.
+
 # Output rules
-- markdown: ONE sentence, ≤15 words, action verb first. No bullets. Don't parrot the speaker.
+- markdown: ONE sentence, ≤15 words, action verb first. No bullets. Don't parrot the speaker. ALWAYS write this when shouldFire=true.
 - priority: 'critical' for principle 5 or correct_contradiction; 'nudge' otherwise. Avoid 'fyi'.
 - agent: 'prospect_suggester' in PROSPECT MODE; 'rep_watcher' in REP MODE.
 - play: closest label from taxonomy below.
 - axis: which BANT axis this suggestion primarily addresses — one of: need | budget | authority | timeline | metric | champion | consequence | competitor | stakeholder. Omit if none fits cleanly.
 - groundedInUtteranceIds + groundedInAnchorTurnIds: cite the evidence from (b).
+
+# Play selection — apply in order, first match wins
+- Pain mentioned, no number / owner / workflow named → drill_vague
+- Number named, downstream cost / consequence / time impact unexplored → quantify_pain
+- Pain quantified, rep moved past without anchoring or translating to cost → rep_skipped_drill
+- Objection raised, rep responded without acknowledge + confirm steps → rep_defended_objection
+- Concrete commitment language from prospect ("let's do that", "send the contract") → trial_close
+- Vague forward step from rep ("I'll send something", "circle back", "stay in touch") → rep_no_next_step
+- Specific next step proposed but missing date / owner / agenda → anchor_next_step
+- ≥3 product/feature claims in rep turn with no tie to a named pain → rep_feature_dump
+- New stakeholder named with role, Need ≥ soft → probe_stakeholder
+- Buyer offers to escalate / share internally / champion behavior → multi_thread
+- Discount or price concession offered before objection or value confirmation → rep_premature_discount
+- Price/scope contradicts a prior anchor (contradiction detected) → correct_contradiction
+- Same concern raised twice (load-bearing) → reframe_objection at priority='critical'
+- Rep pitched a feature that solves a problem the buyer didn't state → rep_off_ladder
 
 # Play taxonomy (labels only)
 drill_vague | quantify_pain | probe_stakeholder | reframe_objection | surface_value_prop | competitor_handle | push_next_axis | trial_close | multi_thread | anchor_next_step | qualify_out | correct_contradiction | rep_leading_question | rep_feature_dump | rep_premature_discount | rep_missed_buying_signal | rep_skipped_drill | rep_defended_objection | rep_off_ladder | rep_no_next_step | rep_pitched_outside_anchor | none`;
@@ -257,7 +284,6 @@ For play=push_next_axis, the target axis MUST come from position 1 or 2 of \`## 
 
 # Cadence — HARD RULE
 Count fired=true entries in last 5 RECENT SUGGESTIONS. If ≥3, this turn MUST be shouldFire=false UNLESS Lens 5 (anchor violation, critical). No exceptions.
-If the immediately prior turn fired and this isn't a critical anchor violation → silent. Rep needs space.
 
 # Silent examples (typical, not edge cases)
 - PROSPECT: "VP Marketing, 130 people, B2B SaaS." → silent (standard discovery answer)
@@ -386,7 +412,6 @@ For play=push_next_axis, the target axis MUST come from position 1 or 2 of \`## 
 
 # Cadence — HARD RULE
 Count fired=true entries in last 5 RECENT SUGGESTIONS. If ≥3, this turn MUST be shouldFire=false UNLESS Lens 5 (anchor violation, critical). No exceptions.
-If the immediately prior turn fired and this isn't a critical anchor violation → silent. Rep needs space.
 
 # Silent examples (typical, not edge cases)
 - PROSPECT: "VP Marketing, 130 people, B2B SaaS." → silent (standard discovery answer; buyer is already in the room — not a stakeholder signal)
@@ -452,6 +477,22 @@ export function buildSuggesterPrompt(opts: {
     (c) => `- [anchor=${c.anchor.turnId} axis=${c.axis}] ${c.reason}`
   );
 
+  // Load-bearing concerns: a concern topic raised 2+ times (or with 2+ utterances
+  // attached via upsert) AND still unaddressed by the rep. These are the concerns
+  // most likely to kill the deal — the buyer brought it back precisely because
+  // the rep didn't land their first response. Surfaced deterministically so the
+  // suggester can prioritize reframe_objection on the current turn if the latest
+  // utterance is touching one of these topics.
+  const activeConcerns = prevMemory.concerns.filter((c) => !c.addressed);
+  const topicCounts = new Map<string, number>();
+  for (const c of activeConcerns) {
+    const n = Math.max(1, c.utteranceIds.length);
+    topicCounts.set(c.topic, (topicCounts.get(c.topic) ?? 0) + n);
+  }
+  const loadBearingTopics = [...topicCounts.entries()]
+    .filter(([, n]) => n >= 2)
+    .map(([t]) => t);
+
   const firedCount = recentSuggestions.slice(-5).filter((r) => r.fired).length;
   const recentLines = recentSuggestions.length === 0
     ? '(none yet)'
@@ -499,6 +540,11 @@ ${priorOpposite ? `[${priorOpposite.id}] ${priorOpposite.speaker === 'rep' ? 'RE
 # RECENT SUGGESTIONS (your last decisions, oldest first; ${firedCount} of last 5 fired)
 ${recentLines}
 
+# LOAD-BEARING CONCERNS (raised ≥ 2 times, still unaddressed)
+${loadBearingTopics.length > 0
+  ? `${loadBearingTopics.join(', ')}\nThe buyer brought one of these back precisely because the rep didn't land the first response. If the LATEST utterance touches any of these topics, fire play='reframe_objection' at priority='critical' — this bypasses cadence. Don't paraphrase, don't pitch features, redirect to LAER + Confirm.`
+  : '(none)'}
+
 # CONTRADICTIONS DETECTED (deterministic anchor checks)
 ${contradictionLines.length > 0 ? contradictionLines.join('\n') : '(none)'}
 
@@ -515,6 +561,16 @@ function applyCadenceFloor(
   recent: RecentSuggestionEntry[],
 ): Omit<Suggestion, 'agent'> {
   if (!raw.shouldFire) return raw;
+
+  // Markdown floor: a fire with empty/near-empty markdown is a blank coach card
+  // — strictly worse than no card. Observed when the suggester fallback model
+  // (gpt-5.4-mini with reasoning disabled) decides to fire but drops the
+  // markdown field. Applies BEFORE the critical bypass so anchor violations
+  // with empty text still get suppressed.
+  if (raw.markdown.trim().split(/\s+/).filter(Boolean).length < 5) {
+    return { ...raw, shouldFire: false };
+  }
+
   // Anchor violations always fire — they're the only thing that bypasses cadence.
   if (raw.play === 'correct_contradiction' || raw.priority === 'critical') return raw;
 
@@ -540,14 +596,89 @@ export async function runSuggester(opts: {
   const { utterance } = opts;
   const isProspect = utterance.speaker === 'customer';
 
+  // Zod's preprocess/default wrappers loosen the inferred type — cast back to
+  // the canonical Suggestion shape since runtime values are guaranteed valid.
   const raw = await llmGenerateObject({
     step: 'suggester',
     modelKey: 'suggester',
     schema: SuggestionSchema.omit({ agent: true }),
     prompt: buildSuggesterPrompt(opts),
     system: opts.system ?? selectSystemPrompt(),
-  });
+  }) as Omit<Suggestion, 'agent'>;
 
-  const gated = applyCadenceFloor(raw, opts.recentSuggestions);
+  const promoted = applyLoadBearingPromotion(raw, opts.prevMemory);
+  const openerGated = applyOpenerPhaseGate(promoted, opts.prevMemory);
+  const gated = applyCadenceFloor(openerGated, opts.recentSuggestions);
   return { ...gated, agent: isProspect ? 'prospect_suggester' : 'rep_watcher' };
+}
+
+// Load-bearing concerns: when a buyer has raised the same topic twice or more
+// and the rep hasn't resolved it, a reframe_objection fire on that topic is
+// the highest-leverage moment of the call. Promote to priority='critical' so
+// it bypasses cadence the same way an anchor violation would. The prompt also
+// instructs the model to do this; this is the code-level safety net.
+function applyLoadBearingPromotion(
+  raw: Omit<Suggestion, 'agent'>,
+  prevMemory: MeetingMemory,
+): Omit<Suggestion, 'agent'> {
+  if (!raw.shouldFire) return raw;
+  if (raw.play !== 'reframe_objection') return raw;
+  if (raw.priority === 'critical') return raw;
+
+  const activeConcerns = prevMemory.concerns.filter((c) => !c.addressed);
+  if (activeConcerns.length === 0) return raw;
+  const topicCounts = new Map<string, number>();
+  for (const c of activeConcerns) {
+    const n = Math.max(1, c.utteranceIds.length);
+    topicCounts.set(c.topic, (topicCounts.get(c.topic) ?? 0) + n);
+  }
+  const hasLoadBearing = [...topicCounts.values()].some((n) => n >= 2);
+  if (!hasLoadBearing) return raw;
+
+  return { ...raw, priority: 'critical' };
+}
+
+// Opener-phase gate: until the rep has asked their first discovery question,
+// most plays cannot fire. Plays that need pain context (drill_vague, quantify_pain)
+// require Need to be at least 'vague'; otherwise the model is firing on the
+// prospect's self-intro, which is not actually vague pain.
+// Plays that are ALWAYS-eligible (criticism of rep behavior, anchor violations)
+// can fire any time. Belt-and-braces for the prompt-level rule — the model has
+// been observed to over-fire on self-intro turns.
+const OPENER_REP_ALWAYS_ELIGIBLE = new Set<string>([
+  'rep_off_ladder',
+  'rep_feature_dump',
+  'rep_premature_discount',
+  'correct_contradiction',
+  'none',
+]);
+// Plays that need at least some pain context to be valid
+const OPENER_PAIN_GATED = new Set<string>([
+  'drill_vague',
+  'quantify_pain',
+]);
+
+function applyOpenerPhaseGate(
+  raw: Omit<Suggestion, 'agent'>,
+  prevMemory: MeetingMemory,
+): Omit<Suggestion, 'agent'> {
+  if (!raw.shouldFire) return raw;
+  const repQuestionCount = prevMemory.flow.filter((f) => f.tag === 'R-Q').length;
+  if (repQuestionCount > 0) return raw; // discovery has started — gate inactive
+
+  // Pre-discovery: rep mistakes / anchor violations always fire
+  if (OPENER_REP_ALWAYS_ELIGIBLE.has(raw.play)) return raw;
+
+  // Pain-related plays need at least vague pain on the table
+  if (OPENER_PAIN_GATED.has(raw.play)) {
+    const need = prevMemory.scorecard.bant.need;
+    if (need === 'unknown') {
+      return { ...raw, shouldFire: false };
+    }
+    return raw;
+  }
+
+  // Everything else (probe_stakeholder, multi_thread, anchor_next_step, trial_close,
+  // push_next_axis, etc.) cannot fire before discovery starts.
+  return { ...raw, shouldFire: false };
 }

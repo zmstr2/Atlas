@@ -152,6 +152,55 @@ export function clearCallLog(): void {
 // `{ object, usage }` matching AI SDK's shape so the surrounding wrapper code
 // stays uniform. Throws on HTTP error, parse failure, or schema mismatch — all
 // of which trigger the existing fallback-key chain in llmGenerateObject.
+// Hand-written JSON Schema for SuggestionSchema.omit({ agent: true }). Used in
+// json_schema strict mode where models support it (gpt-5.4-mini definitely;
+// gpt-oss-20b's various OR providers vary — body is sent and ignored if the
+// provider doesn't honor it, falling back to json_object behavior). Kept in
+// sync with packages/types/src/agents.ts manually; the schema-fuzz script
+// (Wave 3.2) will catch drift.
+const SUGGESTER_JSON_SCHEMA = {
+  name: 'Suggestion',
+  strict: false, // strict=true requires `additionalProperties:false` everywhere; relax for now
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['shouldFire', 'play', 'markdown', 'reasoning'],
+    properties: {
+      shouldFire: { type: 'boolean' },
+      priority: { type: 'string', enum: ['critical', 'nudge', 'fyi'] },
+      play: {
+        type: 'string',
+        enum: [
+          'drill_vague', 'quantify_pain', 'probe_stakeholder', 'reframe_objection',
+          'surface_value_prop', 'competitor_handle', 'push_next_axis', 'trial_close',
+          'multi_thread', 'anchor_next_step', 'qualify_out', 'correct_contradiction',
+          'rep_leading_question', 'rep_feature_dump', 'rep_premature_discount',
+          'rep_missed_buying_signal', 'rep_skipped_drill', 'rep_defended_objection',
+          'rep_off_ladder', 'rep_no_next_step', 'rep_pitched_outside_anchor', 'none',
+        ],
+      },
+      axis: {
+        type: ['string', 'null'],
+        enum: ['need', 'budget', 'authority', 'timeline', 'metric', 'champion',
+               'consequence', 'competitor', 'stakeholder', null],
+      },
+      markdown: { type: 'string' },
+      reasoning: { type: 'string' },
+      groundedInUtteranceIds: { type: 'array', items: { type: 'string' } },
+      groundedInAnchorTurnIds: { type: 'array', items: { type: 'string' } },
+    },
+  },
+};
+
+// Models known to honor OpenAI-style json_schema response_format. Others get
+// the legacy json_object format. List grows as we verify.
+const JSON_SCHEMA_CAPABLE = new Set<string>([
+  'openai/gpt-5.4-mini',
+  'openai/gpt-5.4',
+  'openai/gpt-4o-mini',
+  'openai/gpt-4o',
+]);
+
 async function callOpenRouterDirect<T>(opts: {
   modelId: string;
   schema: ZodType<T>;
@@ -159,10 +208,12 @@ async function callOpenRouterDirect<T>(opts: {
   system?: string;
   reasoning?: OrReasoning;
   signal: AbortSignal;
+  useJsonSchema?: boolean;
 }): Promise<{ object: T; promptTokens: number; completionTokens: number }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not set — required for suggester routing');
 
+  const useSchema = opts.useJsonSchema && JSON_SCHEMA_CAPABLE.has(opts.modelId);
   const body: Record<string, unknown> = {
     model: opts.modelId,
     messages: [
@@ -174,7 +225,9 @@ async function callOpenRouterDirect<T>(opts: {
     ],
     max_tokens: 4000,
     provider: { sort: 'throughput' },
-    response_format: { type: 'json_object' },
+    response_format: useSchema
+      ? { type: 'json_schema', json_schema: SUGGESTER_JSON_SCHEMA }
+      : { type: 'json_object' },
   };
   if (opts.reasoning) body.reasoning = opts.reasoning;
 
@@ -244,6 +297,9 @@ export async function llmGenerateObject<T>(opts: {
         system: opts.system,
         reasoning: reasoningForOpenRouter(opts.modelKey),
         signal: controller.signal,
+        // Suggester paths use json_schema where the model supports it. Falls
+        // back to json_object inside callOpenRouterDirect when not capable.
+        useJsonSchema: opts.modelKey === 'suggester' || opts.modelKey === 'suggesterFallback',
       });
       callLog.push({
         step: opts.step,
