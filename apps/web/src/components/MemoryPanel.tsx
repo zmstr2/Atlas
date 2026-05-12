@@ -53,11 +53,11 @@ function BantCard({ axisKey, card }: { axisKey: string; card: AxisCard }) {
       )}
     >
       <div className="px-2.5 pt-2 pb-2.5 flex flex-col gap-1 flex-1">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-fg-primary">
             {AXIS_LABEL[axisKey] ?? axisKey}
           </span>
-          <span className={cn('text-[10px] font-medium', style.label)}>
+          <span className={cn('text-[10px] font-medium shrink-0', style.label)}>
             {AXIS_STATE_LABEL[state] ?? AXIS_STATE_LABEL.unknown}
           </span>
         </div>
