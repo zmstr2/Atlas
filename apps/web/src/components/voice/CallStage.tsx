@@ -196,7 +196,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
 
         {/* Sidebar card: stacked — CallSidebar on top, live MemoryPanel below */}
         <div className="h-full rounded-2xl border border-[#E7E5E4] bg-white shadow-sm overflow-hidden flex flex-col">
-          <div className="shrink-0 max-h-[55%] overflow-y-auto border-b border-[#E7E5E4]">
+          <div className="shrink-0 border-b border-[#E7E5E4]">
             <CallSidebar
               remoteStream={remoteStream}
               displayName={session?.persona.displayName ?? '...'}
@@ -212,7 +212,15 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
             />
           </div>
           <div className="flex-1 min-h-0">
-            <MemoryPanel memory={memory} factsUI={factsUI} className="w-full bg-white" />
+            <MemoryPanel
+              memory={memory}
+              factsUI={factsUI}
+              className="w-full bg-white"
+              redundantPhrases={[
+                session?.persona.displayName ?? '',
+                subtitle ?? '',
+              ].filter(Boolean)}
+            />
           </div>
         </div>
       </div>
