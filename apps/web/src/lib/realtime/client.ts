@@ -80,6 +80,8 @@ export async function connectRealtime(opts: {
   // assistant audio buffer has stopped streaming — that's the moment the rep
   // is actually about to hear the end of the utterance.
   const pendingPersonaFinal = new Map<string, { text: string; itemId: string }>();
+  // Tracks in-flight drain timers so hangup() can cancel them before they fire.
+  const drainTimers = new Set<ReturnType<typeof setTimeout>>();
 
   dataChannel.onmessage = (msg) => {
     let payload: { type?: string } & Record<string, unknown>;
@@ -88,7 +90,7 @@ export async function connectRealtime(opts: {
     } catch {
       return;
     }
-    routeEvent(payload, events, pendingPersonaFinal);
+    routeEvent(payload, events, pendingPersonaFinal, drainTimers);
   };
 
   // Offer/answer with OpenAI as the remote peer.
@@ -117,6 +119,8 @@ export async function connectRealtime(opts: {
 
   peer.onconnectionstatechange = () => {
     if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
+      drainTimers.forEach(clearTimeout);
+      drainTimers.clear();
       events.close?.(peer.connectionState);
     }
   };
@@ -134,6 +138,8 @@ export async function connectRealtime(opts: {
       }
     },
     hangup() {
+      drainTimers.forEach(clearTimeout);
+      drainTimers.clear();
       try { dataChannel.close(); } catch {}
       try { peer.close(); } catch {}
       micStream.getTracks().forEach(t => t.stop());
@@ -142,11 +148,15 @@ export async function connectRealtime(opts: {
   };
 }
 
-// How long to wait after `output_audio_buffer.stopped` before flushing the
-// persona transcript. `output_audio_buffer.stopped` fires when the server stops
-// streaming audio bytes — but the WebRTC jitter/playback buffer still holds
-// ~200–400 ms of audio. This margin lets the rep hear the persona finish before
+// How long to wait after the server signals audio completion before flushing the
+// persona transcript. Three events can trigger this (`response.output_audio.done`,
+// `output_audio_buffer.stopped`, `response.done`) — all fire when the server stops
+// streaming audio bytes, but the WebRTC jitter/playback buffer still holds
+// ~100–400 ms of audio. This margin lets the rep hear the persona finish before
 // the suggester pipeline fires.
+// Note: this delay also runs on barge-in/cancellation — the transcript flushes
+// after AUDIO_DRAIN_MS even when the persona was interrupted mid-sentence.
+// hangup() cancels in-flight timers so the suggester never fires post-call.
 const AUDIO_DRAIN_MS = 600;
 
 // Translate OpenAI Realtime data-channel events into our wire types.
@@ -154,6 +164,7 @@ function routeEvent(
   payload: { type?: string } & Record<string, unknown>,
   events: Partial<RealtimeEvents>,
   pendingPersonaFinal: Map<string, { text: string; itemId: string }>,
+  drainTimers: Set<ReturnType<typeof setTimeout>>,
 ): void {
   const type = payload.type;
   if (typeof type !== 'string') return;
@@ -161,7 +172,7 @@ function routeEvent(
   // Persona text generation finished. Stash it — do NOT mark final yet, because
   // the audio for this turn is still streaming/playing. The suggester pipeline
   // gates on isFinal, so flushing here would fire suggestions before the rep
-  // has heard the prospect finish.
+  // has heard the persona finish.
   if (type === 'response.output_audio_transcript.done' || type === 'response.audio_transcript.done') {
     const responseId = String(payload.response_id ?? payload.item_id ?? `p-${Date.now()}`);
     const itemId = String(payload.item_id ?? payload.response_id ?? `p-${Date.now()}`);
@@ -188,7 +199,8 @@ function routeEvent(
     if (entry) {
       const key = responseId || [...pendingPersonaFinal.keys()][0]!;
       pendingPersonaFinal.delete(key);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        drainTimers.delete(timer);
         events.transcript?.({
           type: 'transcript',
           speaker: 'persona',
@@ -198,6 +210,7 @@ function routeEvent(
           timestampMs: Date.now(),
         });
       }, AUDIO_DRAIN_MS);
+      drainTimers.add(timer);
     }
     return;
   }
