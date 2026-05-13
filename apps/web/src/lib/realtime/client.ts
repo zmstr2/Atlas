@@ -80,6 +80,8 @@ export async function connectRealtime(opts: {
   // assistant audio buffer has stopped streaming — that's the moment the rep
   // is actually about to hear the end of the utterance.
   const pendingPersonaFinal = new Map<string, { text: string; itemId: string }>();
+  // Tracks in-flight drain timers so hangup() can cancel them before they fire.
+  const drainTimers = new Set<ReturnType<typeof setTimeout>>();
 
   dataChannel.onmessage = (msg) => {
     let payload: { type?: string } & Record<string, unknown>;
@@ -88,7 +90,7 @@ export async function connectRealtime(opts: {
     } catch {
       return;
     }
-    routeEvent(payload, events, pendingPersonaFinal, remoteStream);
+    routeEvent(payload, events, pendingPersonaFinal, drainTimers);
   };
 
   // Offer/answer with OpenAI as the remote peer.
@@ -117,6 +119,8 @@ export async function connectRealtime(opts: {
 
   peer.onconnectionstatechange = () => {
     if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
+      drainTimers.forEach(clearTimeout);
+      drainTimers.clear();
       events.close?.(peer.connectionState);
     }
   };
@@ -134,6 +138,8 @@ export async function connectRealtime(opts: {
       }
     },
     hangup() {
+      drainTimers.forEach(clearTimeout);
+      drainTimers.clear();
       try { dataChannel.close(); } catch {}
       try { peer.close(); } catch {}
       micStream.getTracks().forEach(t => t.stop());
@@ -142,76 +148,23 @@ export async function connectRealtime(opts: {
   };
 }
 
-// Wait until the remote audio stream has been silent for `holdMs`.
-// `output_audio_buffer.stopped` fires when OpenAI's server stops sending audio,
-// but the browser jitter buffer still has 100-400ms of audio queued. Watching
-// the actual playback level lets us flush the transcript when the user has
-// truly heard the persona finish — and naturally handles barge-in (silence is
-// immediate on cancel). `timeoutMs` is a safety net so the pipeline never stalls.
-function waitForRemoteSilence(
-  stream: MediaStream,
-  { thresholdRms = 0.02, holdMs = 150, timeoutMs = 2000 } = {},
-): Promise<void> {
-  return new Promise((resolve) => {
-    if (stream.getAudioTracks().length === 0) {
-      resolve();
-      return;
-    }
-    let ctx: AudioContext;
-    try {
-      ctx = new AudioContext();
-    } catch {
-      resolve();
-      return;
-    }
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.5;
-    source.connect(analyser);
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    let silentSince: number | null = null;
-    let raf = 0;
-    let done = false;
-    const cleanup = () => {
-      if (done) return;
-      done = true;
-      cancelAnimationFrame(raf);
-      try { analyser.disconnect(); } catch {}
-      try { source.disconnect(); } catch {}
-      try { void ctx.close(); } catch {}
-      resolve();
-    };
-    const deadline = setTimeout(cleanup, timeoutMs);
-    const tick = () => {
-      if (done) return;
-      analyser.getByteFrequencyData(data);
-      let sum = 0;
-      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
-      const rms = Math.sqrt(sum / data.length) / 255;
-      const now = performance.now();
-      if (rms < thresholdRms) {
-        if (silentSince === null) silentSince = now;
-        if (now - silentSince >= holdMs) {
-          clearTimeout(deadline);
-          cleanup();
-          return;
-        }
-      } else {
-        silentSince = null;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-  });
-}
+// How long to wait after the server signals audio completion before flushing the
+// persona transcript. Three events can trigger this (`response.output_audio.done`,
+// `output_audio_buffer.stopped`, `response.done`) — all fire when the server stops
+// streaming audio bytes, but the WebRTC jitter/playback buffer still holds
+// ~100–400 ms of audio. This margin lets the rep hear the persona finish before
+// the suggester pipeline fires.
+// Note: this delay also runs on barge-in/cancellation — the transcript flushes
+// after AUDIO_DRAIN_MS even when the persona was interrupted mid-sentence.
+// hangup() cancels in-flight timers so the suggester never fires post-call.
+const AUDIO_DRAIN_MS = 600;
 
 // Translate OpenAI Realtime data-channel events into our wire types.
 function routeEvent(
   payload: { type?: string } & Record<string, unknown>,
   events: Partial<RealtimeEvents>,
   pendingPersonaFinal: Map<string, { text: string; itemId: string }>,
-  remoteStream: MediaStream,
+  drainTimers: Set<ReturnType<typeof setTimeout>>,
 ): void {
   const type = payload.type;
   if (typeof type !== 'string') return;
@@ -219,7 +172,7 @@ function routeEvent(
   // Persona text generation finished. Stash it — do NOT mark final yet, because
   // the audio for this turn is still streaming/playing. The suggester pipeline
   // gates on isFinal, so flushing here would fire suggestions before the rep
-  // has heard the prospect finish.
+  // has heard the persona finish.
   if (type === 'response.output_audio_transcript.done' || type === 'response.audio_transcript.done') {
     const responseId = String(payload.response_id ?? payload.item_id ?? `p-${Date.now()}`);
     const itemId = String(payload.item_id ?? payload.response_id ?? `p-${Date.now()}`);
@@ -246,7 +199,8 @@ function routeEvent(
     if (entry) {
       const key = responseId || [...pendingPersonaFinal.keys()][0]!;
       pendingPersonaFinal.delete(key);
-      void waitForRemoteSilence(remoteStream).then(() => {
+      const timer = setTimeout(() => {
+        drainTimers.delete(timer);
         events.transcript?.({
           type: 'transcript',
           speaker: 'persona',
@@ -255,7 +209,8 @@ function routeEvent(
           isFinal: true,
           timestampMs: Date.now(),
         });
-      });
+      }, AUDIO_DRAIN_MS);
+      drainTimers.add(timer);
     }
     return;
   }
