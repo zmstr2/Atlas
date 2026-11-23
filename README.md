@@ -46,7 +46,7 @@ Code map: `src/app` (pages and API routes), `src/server` (LLM agents and prompts
 |---|---|---|
 | Prospect voice | `gpt-realtime-2.1` | OpenAI Realtime |
 | Mic transcription | `gpt-live-transcribe` | OpenAI Realtime |
-| Live suggestions | `z-ai/glm-5.1`, fallback `moonshotai/kimi-k2.6` | OpenRouter |
+| Live suggestions | `gpt-6-luna` (reasoning off) | Vercel AI Gateway |
 | Memory extractor and panel | `gpt-6-luna` (reasoning off) | Vercel AI Gateway |
 | Chat coach | `gpt-oss-120b` | Vercel AI Gateway |
 
@@ -54,11 +54,11 @@ All overridable with env vars; see `apps/web/.env.example`.
 
 ## Run it locally
 
-Requires [Bun](https://bun.sh) 1.x, plus API keys for OpenAI, the Vercel AI Gateway and OpenRouter.
+Requires [Bun](https://bun.sh) 1.x, plus two API keys: OpenAI and the Vercel AI Gateway.
 
 ```bash
 bun install
-cp apps/web/.env.example apps/web/.env.local   # fill in the three keys
+cp apps/web/.env.example apps/web/.env.local   # fill in the two keys
 bun run dev                                    # http://localhost:3000
 ```
 
@@ -67,7 +67,7 @@ Other scripts: `bun run typecheck`, `bun run test`, `bun run build`.
 ## Deploying (Vercel)
 
 1. Import the repo in Vercel and set the **Root Directory** to `apps/web`.
-2. Add the env vars from `apps/web/.env.example` (`OPENAI_API_KEY`, `VERCEL_AI_GATEWAY_TOKEN`, `OPENROUTER_API_KEY`).
+2. Add the env vars from `apps/web/.env.example` (`OPENAI_API_KEY`, `VERCEL_AI_GATEWAY_TOKEN`).
 3. Add the **Upstash Redis** integration from the Vercel Marketplace so the daily caps persist.
 
 ### Cost protection
