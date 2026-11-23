@@ -1,12 +1,18 @@
 import { Hono } from 'hono';
 import { PersonaIdSchema } from '@atlas/types';
 import { getPersona, PERSONA_TOOLS } from './personas';
+import { checkRealtimeLimits } from './limits';
 
 export const realtimeRoutes = new Hono();
 
 const REALTIME_MODEL = process.env.OPENAI_REALTIME_MODEL ?? 'gpt-realtime';
 
 realtimeRoutes.post('/session', async (c) => {
+  const limit = checkRealtimeLimits(c);
+  if (!limit.ok) {
+    return c.json({ error: limit.error, code: limit.code }, limit.status);
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const parsed = PersonaIdSchema.safeParse(body.personaId);
   if (!parsed.success) {

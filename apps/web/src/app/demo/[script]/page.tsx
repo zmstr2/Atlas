@@ -7,8 +7,8 @@ import { SuggestionBar, type SuggestionState } from '@/components/SuggestionBar'
 import { TranscriptView } from '@/components/TranscriptView';
 import { PreCallBriefHeader } from '@/components/PreCallBrief';
 import { connectSSE } from '@/lib/sse';
+import { AGENT_URL } from '@/lib/config';
 
-const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:3001';
 
 const SCRIPT_LABELS: Record<string, string> = {
   jordan: 'Jordan Hayes',

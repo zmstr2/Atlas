@@ -4,11 +4,18 @@ import { demoRoutes } from './routes/demo';
 import { realtimeRoutes } from './realtime/session';
 import { chatRoutes } from './routes/chat';
 import { coachWebSocketHandler, type CoachWebSocketData } from './coach/ws';
+import { allowedOrigins } from './realtime/limits';
+
+// Fail loudly: a prod deploy without WEB_ORIGIN would silently fall back to
+// localhost and every browser request from the real site would fail CORS.
+if ((process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) && !process.env.WEB_ORIGIN) {
+  throw new Error('WEB_ORIGIN must be set in production (e.g. https://your-app.vercel.app)');
+}
 
 const app = new Hono();
 
 app.use('*', cors({
-  origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+  origin: allowedOrigins(),
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Call-Id'],
 }));
