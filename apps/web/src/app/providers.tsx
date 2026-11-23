@@ -5,8 +5,11 @@ import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 
-if (typeof window !== 'undefined') {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_TOKEN!, {
+// Analytics are optional: without a token the app runs with PostHog disabled.
+const POSTHOG_TOKEN = process.env.NEXT_PUBLIC_POSTHOG_TOKEN;
+
+if (typeof window !== 'undefined' && POSTHOG_TOKEN) {
+  posthog.init(POSTHOG_TOKEN, {
     api_host: '/ingest',
     ui_host: 'https://us.posthog.com',
     defaults: '2026-01-30',

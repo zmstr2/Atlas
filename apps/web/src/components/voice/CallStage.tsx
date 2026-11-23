@@ -1,12 +1,11 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import posthog from 'posthog-js';
-import type { PersonaId, MeetingMemory, CallFactsUI } from '@atlas/types';
+import type { PersonaId } from '@atlas/types';
 import { lookupLead, lookupCompany } from '@atlas/types';
 import { connectRealtime, type RealtimeClient, type RealtimeSessionInfo } from '@/lib/realtime/client';
-import { useCoachWS } from '@/lib/coach/ws';
-import { connectSSE } from '@/lib/sse';
-import { AGENT_URL, MAX_CALL_MS } from '@/lib/config';
+import { useCoach } from '@/lib/coach/useCoach';
+import { MAX_CALL_MS } from '@/lib/config';
 import { CoachChat } from './CoachChat';
 import { CallSidebar } from './CallSidebar';
 import { PostCallRating } from './PostCallRating';
@@ -35,9 +34,6 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
   const [resizing, setResizing] = useState(false);
   const audioElRef = useRef<HTMLAudioElement>(null);
   const realtimeRef = useRef<RealtimeClient | null>(null);
-  const sseCleanupRef = useRef<(() => void) | null>(null);
-  const [memory, setMemory] = useState<MeetingMemory | null>(null);
-  const [factsUI, setFactsUI] = useState<CallFactsUI | null>(null);
   const callStartRef = useRef<number>(Date.now());
 
   const onResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -59,14 +55,14 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     window.addEventListener('pointerup', onUp);
   };
 
-  const { suggestions, errors, sendTranscript, sendPersonaToolCall, endCall: coachEndCall } = useCoachWS({ callId, personaId });
+  const { suggestions, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall: coachEndCall, getChatContext } = useCoach({ callId, personaId });
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        const sessionResp = await fetch(`${AGENT_URL}/realtime/session`, {
+        const sessionResp = await fetch('/api/realtime/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ personaId }),
@@ -104,11 +100,6 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
         }
         realtimeRef.current = client;
         setPhase('live');
-
-        sseCleanupRef.current = connectSSE(callId, {
-          onMemoryDiff: (e) => setMemory(e.snapshot),
-          onFactsUiDelta: (e) => setFactsUI(e.ui),
-        });
       } catch (err) {
         if (cancelled) return;
         // fetch() rejects with a TypeError when the agent is down or unreachable.
@@ -125,8 +116,6 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
       cancelled = true;
       realtimeRef.current?.hangup();
       realtimeRef.current = null;
-      sseCleanupRef.current?.();
-      sseCleanupRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personaId, callId]);
@@ -195,7 +184,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
       {/* Chat: fills remaining space, no card frame */}
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <CoachChat
-          callId={callId}
+          getChatContext={getChatContext}
           suggestions={suggestions}
           title={session ? `Atlas / Discovery call with ${session.persona.displayName}` : 'Atlas'}
         />

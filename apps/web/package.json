@@ -6,11 +6,14 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.55",
     "@ai-sdk/react": "^3.0.174",
     "@atlas/types": "workspace:*",
+    "@upstash/redis": "^1.34.0",
     "ai": "^6.0.172",
     "clsx": "^2.1.1",
     "nanoid": "^5.1.11",

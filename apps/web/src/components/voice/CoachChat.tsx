@@ -4,25 +4,25 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Streamdown } from 'streamdown';
 import { LeadResultCard, CompanyResultCard, ContactResultCard, ToolErrorCard } from './CRMCard';
-import type { CoachSuggestion } from '@/lib/coach/ws';
+import type { CoachSuggestion } from '@/lib/coach/useCoach';
+import type { ChatContext } from '@/lib/coach/protocol';
 import { cn } from '@/lib/cn';
 
-const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:3001';
-
 export function CoachChat({
-  callId,
+  getChatContext,
   suggestions,
   title,
 }: {
-  callId: string;
+  getChatContext: () => ChatContext;
   suggestions: CoachSuggestion[];
   title?: string;
 }) {
+  // The server is stateless, so every message carries the call's current context.
   const transport = useMemo(() =>
     new DefaultChatTransport<UIMessage>({
-      api: `${AGENT_URL}/chat`,
-      headers: { 'X-Call-Id': callId },
-    }), [callId]);
+      api: '/api/chat',
+      body: () => ({ context: getChatContext() }),
+    }), [getChatContext]);
 
   const { messages, sendMessage, status } = useChat<UIMessage>({ transport });
 
