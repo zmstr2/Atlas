@@ -12,7 +12,7 @@ const gateway = createOpenAI({
 
 const COACH_MODEL = process.env.COACH_MODEL ?? 'openai/gpt-oss-120b';
 
-const COACH_SYSTEM = `You are Atlas, a real-time sales coaching agent assisting an Artisan AI sales rep during a live discovery call.
+const COACH_SYSTEM = `You are Atlas, a real-time sales coaching agent assisting a sales rep during a live discovery call.
 
 You are watching the call as it happens. The rep can ask you questions on the side — about the lead, the company, decision-makers, objection patterns, talk tracks, anything.
 

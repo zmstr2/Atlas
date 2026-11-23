@@ -8,7 +8,7 @@ import { CallStage } from '@/components/voice/CallStage';
 
 const PERSONA_META: Record<PersonaId, { name: string; role: string; org: string; color: string }> = {
   jordan: { name: 'Jordan Hayes', role: 'VP Marketing', org: 'MidCo', color: '#0ea5e9' },
-  mia: { name: 'Mia Chen', role: 'Cofounder & CTO', org: 'Drift Labs', color: '#f97316' },
+  mia: { name: 'Mia Chen', role: 'Cofounder & CEO', org: 'Kestrel', color: '#f97316' },
   pastor: { name: 'Pastor Marcus Webb', role: 'Lead Pastor', org: 'Cornerstone Church', color: '#8b5cf6' },
   'vp-sales': { name: 'Cass Rivera', role: 'VP of Sales', org: 'Forge Analytics', color: '#ef4444' },
 };

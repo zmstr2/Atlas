@@ -6,7 +6,7 @@
 
 **A live coach for sales calls.** Atlas listens to a discovery call as it happens and, in real time, suggests what the rep should say next, tracks what has actually been learned about the deal, and flags what is still missing.
 
-> 🎯 **Try it:** open the demo, click **Join now** on the Meet-style screen, and talk to an AI prospect (a skeptical startup CTO) with Atlas coaching you on the side. You need a microphone and a desktop browser. Calls are capped at 5 minutes.
+> 🎯 **Try it:** open the demo, click **Join now** on the Meet-style screen, and talk to an AI prospect (Mia, the CEO of a growing startup) with Atlas coaching you on the side. Pitch whatever you want: she doesn't know what you're selling until you say, so it works for any product or service. You need a microphone and a desktop browser. Calls are capped at 5 minutes.
 >
 > **Live demo:** _add your deployed URL here_
 
