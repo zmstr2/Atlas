@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { nanoid } from 'nanoid';
 import posthog from 'posthog-js';
@@ -77,7 +77,10 @@ function timeToMinutes(t: string): number {
 
 export default function VoiceLandingPage() {
   const [active, setActive] = useState<ActiveCall | null>(null);
-  const [todayKey] = useState<DayKey>(getTodayKey);
+  // Start on the fallback day so server and client render identically, then
+  // switch to the visitor's real weekday after hydration.
+  const [todayKey, setTodayKey] = useState<DayKey>('thu');
+  useEffect(() => setTodayKey(getTodayKey()), []);
 
   if (active) {
     return (

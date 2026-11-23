@@ -7,8 +7,9 @@ import type {
   TranscriptEvent,
   PersonaToolCallEvent,
 } from '@atlas/types';
+import { AGENT_URL } from '../config';
 
-const WS_URL = (process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:3001').replace(/^http/, 'ws') + '/coach/ws';
+const WS_URL = AGENT_URL.replace(/^http/, 'ws') + '/coach/ws';
 
 export type CoachSuggestion = {
   id: string;

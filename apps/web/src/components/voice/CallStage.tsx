@@ -6,12 +6,12 @@ import { lookupLead, lookupCompany } from '@atlas/types';
 import { connectRealtime, type RealtimeClient, type RealtimeSessionInfo } from '@/lib/realtime/client';
 import { useCoachWS } from '@/lib/coach/ws';
 import { connectSSE } from '@/lib/sse';
+import { AGENT_URL, MAX_CALL_MS } from '@/lib/config';
 import { CoachChat } from './CoachChat';
 import { CallSidebar } from './CallSidebar';
 import { PostCallRating } from './PostCallRating';
 import { MemoryPanel } from '@/components/MemoryPanel';
 
-const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:3001';
 
 export type CallStageProps = {
   personaId: PersonaId;
@@ -73,7 +73,12 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
         });
         if (!sessionResp.ok) {
           const detail = await sessionResp.text();
-          throw new Error(`Session failed (${sessionResp.status}): ${detail.slice(0, 200)}`);
+          let friendly: string | null = null;
+          try {
+            const j = JSON.parse(detail) as { error?: string; code?: string };
+            if (sessionResp.status === 429 || sessionResp.status === 403) friendly = j.error ?? null;
+          } catch { /* not JSON */ }
+          throw new Error(friendly ?? `Session failed (${sessionResp.status}): ${detail.slice(0, 200)}`);
         }
         const info = (await sessionResp.json()) as RealtimeSessionInfo;
         if (cancelled) return;
@@ -106,7 +111,12 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
         });
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'connect_failed');
+        // fetch() rejects with a TypeError when the agent is down or unreachable.
+        setError(
+          err instanceof TypeError
+            ? 'The Atlas demo server is unreachable right now. Please try again in a bit.'
+            : err instanceof Error ? err.message : 'connect_failed',
+        );
         setPhase('error');
       }
     })();
@@ -120,6 +130,13 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personaId, callId]);
+
+  // Auto hang up at the cap so a forgotten tab can't keep billing a live session.
+  useEffect(() => {
+    if (phase !== 'live') return;
+    const t = setTimeout(() => hangupRef.current(), MAX_CALL_MS);
+    return () => clearTimeout(t);
+  }, [phase]);
 
   // Pipe remote audio to <audio> element so it actually plays.
   useEffect(() => {
@@ -140,6 +157,9 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     realtimeRef.current = null;
     setPhase('ended');
   };
+
+  const hangupRef = useRef(hangup);
+  hangupRef.current = hangup;
 
   const toggleMute = () => {
     const next = !muted;

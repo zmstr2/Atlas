@@ -1,6 +1,7 @@
 'use client';
 
 import type { SSEEvent } from '@atlas/types';
+import { AGENT_URL } from './config';
 
 export type SSEHandlers = {
   onUtterance?: (e: Extract<SSEEvent, { type: 'utterance' }>) => void;
@@ -15,7 +16,7 @@ export type SSEHandlers = {
 };
 
 export function connectSSE(callId: string, handlers: SSEHandlers): () => void {
-  const agentUrl = process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:3001';
+  const agentUrl = AGENT_URL;
   let es: EventSource | null = null;
   let cancelled = false;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
