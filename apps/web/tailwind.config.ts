@@ -14,7 +14,7 @@ const config: Config = {
         fg: {
           primary: '#1C1917',
           secondary: '#57534E',
-          muted: '#A8A29E',
+          muted: '#78716C', // 4.8:1 on white (was #A8A29E, 2.5:1)
         },
         accent: {
           DEFAULT: '#5B3FBE',
@@ -47,6 +47,10 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'atlas-flash': {
+          from: { backgroundColor: '#EFEAFA' },
+          to: { backgroundColor: 'transparent' },
+        },
         pulse: {
           '0%, 100%': { opacity: '0.6' },
           '50%': { opacity: '1' },
@@ -55,6 +59,8 @@ const config: Config = {
       animation: {
         'slide-in': 'slide-in 240ms ease-out forwards',
         'atlas-pulse': 'pulse 1.6s ease-in-out infinite',
+        // Marks a memory item that just changed; fades out on its own.
+        'atlas-flash': 'atlas-flash 1.6s cubic-bezier(0.22, 1, 0.36, 1)',
       },
     },
   },

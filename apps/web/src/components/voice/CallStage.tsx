@@ -22,7 +22,11 @@ type CallPhase = 'connecting' | 'live' | 'ended' | 'error';
 
 const SIDEBAR_MIN_WIDTH = 360;
 const SIDEBAR_MAX_WIDTH = 720;
-const SIDEBAR_DEFAULT_WIDTH = typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.44) : 480;
+// Fixed default so server and client render the same; the saved or
+// window-relative width is applied after mount.
+const SIDEBAR_DEFAULT_WIDTH = 440;
+const SIDEBAR_WIDTH_KEY = 'atlas.sidebarWidth';
+const clampWidth = (w: number) => Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(w)));
 
 export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
   const [phase, setPhase] = useState<CallPhase>('connecting');
@@ -36,6 +40,23 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
   const realtimeRef = useRef<RealtimeClient | null>(null);
   const callStartRef = useRef<number>(Date.now());
 
+  // Restore the rep's preferred panel width, else ~36% of the window.
+  useEffect(() => {
+    let saved: number | null = null;
+    try { saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || null; } catch { /* storage blocked */ }
+    setSidebarWidth(clampWidth(saved ?? window.innerWidth * 0.36));
+  }, []);
+  useEffect(() => {
+    if (resizing) return;
+    try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); } catch { /* storage blocked */ }
+  }, [sidebarWidth, resizing]);
+
+  const onResizeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 64 : 16;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); setSidebarWidth((w) => clampWidth(w + step)); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); setSidebarWidth((w) => clampWidth(w - step)); }
+  };
+
   const onResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -43,7 +64,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     setResizing(true);
     const onMove = (ev: PointerEvent) => {
       const delta = startX - ev.clientX;
-      const next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta));
+      const next = clampWidth(startWidth + delta);
       setSidebarWidth(next);
     };
     const onUp = () => {
@@ -155,6 +176,21 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     setMuted(next);
     realtimeRef.current?.setMuted(next);
   };
+  // M toggles mute, except while typing in the chat box.
+  const toggleMuteRef = useRef(toggleMute);
+  toggleMuteRef.current = toggleMute;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'm' && e.key !== 'M') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      toggleMuteRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
 
   const subtitle = useMemo(() => {
     if (!session?.persona.leadId) return undefined;
@@ -196,11 +232,16 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize sidebar"
+          aria-label="Resize memory panel"
+          aria-valuemin={SIDEBAR_MIN_WIDTH}
+          aria-valuemax={SIDEBAR_MAX_WIDTH}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
           onPointerDown={onResizePointerDown}
-          className="absolute left-[-12px] top-0 bottom-0 w-3 cursor-col-resize group z-10 flex items-center justify-center"
+          onKeyDown={onResizeKeyDown}
+          className="absolute left-[-12px] top-0 bottom-0 w-3 cursor-col-resize group z-10 flex items-center justify-center rounded focus-visible:outline-none"
         >
-          <div className="w-[3px] h-8 rounded-full bg-transparent group-hover:bg-[#C8C6C3] transition-colors duration-150" />
+          <div className="w-[3px] h-8 rounded-full bg-transparent group-hover:bg-[#C8C6C3] group-focus-visible:bg-accent transition-colors duration-150" />
         </div>
 
         {/* Sidebar card: stacked — CallSidebar on top, live MemoryPanel below */}
@@ -227,6 +268,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
                 session?.persona.displayName ?? '',
                 subtitle ?? '',
               ].filter(Boolean)}
+              prospectName={session?.persona.displayName.split(' ')[0] ?? 'Prospect'}
             />
           </div>
         </div>

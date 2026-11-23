@@ -56,27 +56,28 @@ export function CallSidebar({
               }`}
               aria-hidden="true"
             />
-            <span className="text-[10px] uppercase tracking-wider text-fg-muted">
-              {PHASE_LABEL[phase]}
-            </span>
+            <span className="text-xs text-fg-muted">{PHASE_LABEL[phase]}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           <IconButton
-            label={muted ? 'Unmute microphone' : 'Mute microphone'}
+            label={muted ? 'Unmute microphone (M)' : 'Mute microphone (M)'}
             onClick={onToggleMute}
-            tone={muted ? 'accent' : 'neutral'}
+            tone={muted ? 'on' : 'neutral'}
+            pressed={muted}
           >
             {muted ? <MicMutedIcon /> : <MicIcon />}
           </IconButton>
-          <IconButton
-            label="End call"
+          {/* Labelled and spaced apart from mute: ending the call is not undoable. */}
+          <button
+            type="button"
             onClick={onHangup}
-            tone="destructive"
+            className="h-8 pl-2.5 pr-3 flex items-center gap-1.5 rounded-lg text-xs font-medium text-signal-negative bg-signal-negative/10 transition-colors duration-150 hover:bg-signal-negative hover:text-white active:bg-[#991B1B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-negative focus-visible:ring-offset-2"
           >
             <HangupIcon />
-          </IconButton>
+            End call
+          </button>
         </div>
       </div>
 
@@ -108,26 +109,28 @@ function IconButton({
   label,
   onClick,
   tone,
+  pressed,
   children,
 }: {
   label: string;
   onClick: () => void;
-  tone: 'neutral' | 'accent' | 'destructive';
+  /** 'on' = a toggle that is currently engaged (e.g. muted). */
+  tone: 'neutral' | 'on';
+  pressed?: boolean;
   children: React.ReactNode;
 }) {
   const toneClass =
-    tone === 'destructive'
-      ? 'bg-signal-negative/10 text-signal-negative hover:bg-signal-negative hover:text-white'
-      : tone === 'accent'
-        ? 'text-accent bg-accent/10 hover:bg-accent/15'
-        : 'text-fg-secondary bg-bg-subtle hover:text-fg-primary hover:bg-bg-muted';
+    tone === 'on'
+      ? 'text-white bg-fg-primary hover:bg-fg-secondary'
+      : 'text-fg-secondary bg-bg-subtle hover:text-fg-primary hover:bg-bg-muted';
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
+      aria-pressed={pressed}
       title={label}
-      className={`w-8 h-8 flex items-center justify-center rounded-lg transition ${toneClass}`}
+      className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${toneClass}`}
     >
       {children}
     </button>

@@ -103,11 +103,15 @@ function pickEvidence(
 function buildAxisCard(memory: MeetingMemory, axisKey: AxisKey, state: AxisState): AxisCard {
   const ev = pickEvidence(memory, axisKey);
   const render = memory.bantRender?.[axisKey];
+  const uiState = uiAxisState(state);
   return {
-    state: uiAxisState(state),
-    headline: render?.headline ?? null,
+    state: uiState,
+    // The panel agent writes headlines on its own cadence. Until it has, fall
+    // back to the strongest evidence so a scored axis never renders empty.
+    headline: render?.headline ?? (uiState !== 'unknown' ? ev.evidence : null),
     detail: render?.detail ?? null,
     anchorTurnId: ev.anchorTurnId,
+    quote: ev.anchorTurnId ? ev.evidence : null,
   };
 }
 

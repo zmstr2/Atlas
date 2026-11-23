@@ -38,8 +38,14 @@ describe('buildCallFactsUI', () => {
     expect(ui.bant.need.state).toBe('firm');
     expect(ui.meddic.metrics.state).toBe('firm');
     expect(ui.meddic.metrics.anchorTurnId).toBe('t06');
-    // headline is null until bantRender is written by the extractor; anchorTurnId links the verbatim
-    expect(ui.meddic.metrics.headline).toBeNull();
+    // Until the panel agent writes bantRender, a scored axis falls back to its
+    // strongest evidence so it never renders as "Confirmed" with no content.
+    expect(ui.meddic.metrics.headline).toBe('six hours every Tuesday');
+    // Verbatim anchors are surfaced as the prospect's own words.
+    expect(ui.meddic.metrics.quote).toBe('six hours every Tuesday');
+    // Unscored axes stay empty.
+    expect(ui.bant.authority.state).toBe('unknown');
+    expect(ui.bant.authority.headline).toBeNull();
   });
 
   test('budget confirmed_negative → hard disqualifier flag', () => {

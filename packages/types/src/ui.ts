@@ -6,6 +6,8 @@ export const AxisCardSchema = z.object({
   headline: z.string().nullable(),
   detail: z.string().nullable(),
   anchorTurnId: z.string().nullable(),
+  // The prospect's own words behind this card, when a verbatim anchor exists.
+  quote: z.string().nullable().optional(),
 });
 export type AxisCard = z.infer<typeof AxisCardSchema>;
 
