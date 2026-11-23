@@ -15,7 +15,10 @@ export type CoachSuggestion = {
 };
 
 export type UseCoachReturn = {
+  /** Live coaching, one per turn. Shown in the side panel's "Next move" card. */
   suggestions: CoachSuggestion[];
+  /** Briefing and call events (e.g. the persona booking a next step). Shown in the chat. */
+  notes: CoachSuggestion[];
   memory: MeetingMemory | null;
   factsUI: CallFactsUI | null;
   errors: string[];
@@ -40,6 +43,7 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
   const abortRef = useRef<AbortController | null>(null);
 
   const [suggestions, setSuggestions] = useState<CoachSuggestion[]>([]);
+  const [notes, setNotes] = useState<CoachSuggestion[]>([]);
   const [memory, setMemory] = useState<MeetingMemory | null>(null);
   const [factsUI, setFactsUI] = useState<CallFactsUI | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -47,6 +51,10 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
   const addSuggestion = useCallback((s: CoachSuggestion) => {
     recentRef.current = [...recentRef.current, s.content].slice(-5);
     setSuggestions((prev) => (prev.some((p) => p.id === s.id) ? prev : [...prev, s]));
+  }, []);
+
+  const addNote = useCallback((s: CoachSuggestion) => {
+    setNotes((prev) => (prev.some((p) => p.id === s.id) ? prev : [...prev, s]));
   }, []);
 
   const publishMemory = useCallback(() => {
@@ -64,13 +72,14 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
     startedRef.current = Date.now();
     recentRef.current = [];
     setSuggestions([]);
+    setNotes([]);
     setMemory(null);
     setFactsUI(null);
     setErrors([]);
     const intro = INTRO_BY_PERSONA[personaId];
-    if (intro) addSuggestion({ id: `intro-${callId}`, content: intro, reason: 'call_intro', ts: Date.now() });
+    if (intro) addNote({ id: `intro-${callId}`, content: intro, reason: 'call_intro', ts: Date.now() });
     return () => abortRef.current?.abort();
-  }, [callId, personaId, addSuggestion]);
+  }, [callId, personaId, addNote]);
 
   const applyEvent = useCallback((e: TurnEvent) => {
     switch (e.type) {
@@ -164,13 +173,13 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
   }, [callId, personaId, applyEvent]);
 
   const sendPersonaToolCall = useCallback((event: PersonaToolCallEvent) => {
-    addSuggestion({
+    addNote({
       id: `tool-${event.callId}`,
       content: `Persona invoked \`${event.name}\` with ${JSON.stringify(event.args)}`,
       reason: 'persona_tool_call',
       ts: Date.now(),
     });
-  }, [addSuggestion]);
+  }, [addNote]);
 
   const endCall = useCallback(() => {
     abortRef.current?.abort();
@@ -184,5 +193,5 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
     suggestions: recentRef.current,
   }), [personaId]);
 
-  return { suggestions, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall, getChatContext };
+  return { suggestions, notes, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall, getChatContext };
 }

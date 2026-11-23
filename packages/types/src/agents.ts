@@ -83,6 +83,22 @@ export const SuggestionSchema = z.object({
 });
 export type Suggestion = z.infer<typeof SuggestionSchema>;
 
+// What we ask the LLM for. OpenAI strict structured outputs require EVERY key to
+// be listed in `required` (no .default()/.optional()), or the whole request is
+// rejected ("Missing 'priority'"). Defaults and coercions live in SuggestionSchema,
+// which each agent runs this output through afterwards.
+export const SuggestionOutputSchema = z.object({
+  shouldFire: z.boolean(),
+  priority: z.enum(['critical', 'nudge', 'fyi']),
+  play: SuggestionPlaySchema,
+  axis: AnchorAxisSchema.nullable(),
+  markdown: z.string(),
+  reasoning: z.string(),
+  groundedInUtteranceIds: z.array(z.string()),
+  groundedInAnchorTurnIds: z.array(z.string()),
+});
+export type SuggestionOutput = z.infer<typeof SuggestionOutputSchema>;
+
 // ---------- Memory patch (replaces ExtractorPatch's role) ----------
 
 const FactPatchSchema = z.object({

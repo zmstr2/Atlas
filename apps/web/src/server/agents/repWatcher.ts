@@ -1,4 +1,4 @@
-import { SuggestionSchema } from '@atlas/types';
+import { SuggestionOutputSchema, SuggestionSchema } from '@atlas/types';
 import type { Suggestion, Utterance, MeetingMemory, PreCallBrief } from '@atlas/types';
 import { llmGenerateObject } from '../llm/wrapper';
 import { renderMemoryMarkdown } from '@/lib/memory/render';
@@ -84,10 +84,11 @@ Decide whether the rep made a mistake or missed a cue. Output the structured Sug
   const raw = await llmGenerateObject({
     step: 'rep_watcher',
     modelKey: 'suggester',
-    schema: SuggestionSchema.omit({ agent: true }),
+    // Strict-safe shape for the model; SuggestionSchema then applies defaults.
+    schema: SuggestionOutputSchema,
     prompt,
     system: SYSTEM,
-  }) as Omit<Suggestion, 'agent'>;
+  });
 
-  return { ...raw, agent: 'rep_watcher' };
+  return { ...SuggestionSchema.omit({ agent: true }).parse(raw), agent: 'rep_watcher' };
 }

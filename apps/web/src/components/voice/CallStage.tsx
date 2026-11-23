@@ -76,7 +76,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     window.addEventListener('pointerup', onUp);
   };
 
-  const { suggestions, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall: coachEndCall, getChatContext } = useCoach({ callId, personaId });
+  const { suggestions, notes, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall: coachEndCall, getChatContext } = useCoach({ callId, personaId });
 
   useEffect(() => {
     let cancelled = false;
@@ -221,7 +221,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <CoachChat
           getChatContext={getChatContext}
-          suggestions={suggestions}
+          notes={notes}
           title={session ? `Atlas / Discovery call with ${session.persona.displayName}` : 'Atlas'}
         />
       </div>
@@ -263,6 +263,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
             <MemoryPanel
               memory={memory}
               factsUI={factsUI}
+              suggestions={suggestions}
               className="w-full bg-white"
               redundantPhrases={[
                 session?.persona.displayName ?? '',

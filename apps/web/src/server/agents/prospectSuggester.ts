@@ -1,4 +1,4 @@
-import { SuggestionSchema } from '@atlas/types';
+import { SuggestionOutputSchema, SuggestionSchema } from '@atlas/types';
 import type { Suggestion, Utterance, MeetingMemory, PreCallBrief } from '@atlas/types';
 import { llmGenerateObject } from '../llm/wrapper';
 import { renderMemoryMarkdown } from '@/lib/memory/render';
@@ -118,10 +118,11 @@ Decide whether to fire a suggestion, and if so which play. Output the structured
   const raw = await llmGenerateObject({
     step: 'prospect_suggester',
     modelKey: 'suggester',
-    schema: SuggestionSchema.omit({ agent: true }),
+    // Strict-safe shape for the model; SuggestionSchema then applies defaults.
+    schema: SuggestionOutputSchema,
     prompt,
     system: SYSTEM,
-  }) as Omit<Suggestion, 'agent'>;
+  });
 
-  return { ...raw, agent: 'prospect_suggester' };
+  return { ...SuggestionSchema.omit({ agent: true }).parse(raw), agent: 'prospect_suggester' };
 }

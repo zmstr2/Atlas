@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { MeetingMemory, Concern, CallFactsUI, AxisCard, RelevantFact } from '@atlas/types';
+import { Streamdown } from 'streamdown';
 import { cn } from '@/lib/cn';
+import type { CoachSuggestion } from '@/lib/coach/useCoach';
 
 // ─── Change tracking ────────────────────────────────────────────────────────
 // "Change is the story": an item whose content changes gets a brief tint that
@@ -111,6 +113,51 @@ function AxisRow({ axisKey, card }: { axisKey: AxisKey; card: AxisCard }) {
         </div>
       )}
     </li>
+  );
+}
+
+// ─── Next move ──────────────────────────────────────────────────────────────
+
+/**
+ * The one place live coaching shows up. The newest AI suggestion wins; before
+ * the first arrives we fall back to the scorecard's template prompt for the
+ * next unfilled axis. Older suggestions stay one click away.
+ */
+function NextMoveCard({ suggestions, fallbackPrompt }: { suggestions: CoachSuggestion[]; fallbackPrompt: string | null }) {
+  const [showEarlier, setShowEarlier] = useState(false);
+  const latest = suggestions.length ? suggestions[suggestions.length - 1] : null;
+  const earlier = suggestions.slice(0, -1).reverse();
+  if (!latest && !fallbackPrompt) return null;
+
+  return (
+    <div className="rounded-lg bg-accent-soft px-3 py-2.5" role="status" aria-live="polite">
+      <div className="text-xs font-semibold text-accent">{latest ? 'Next move' : 'Ask next'}</div>
+      {/* Keyed by id so a new suggestion eases in instead of swapping silently. */}
+      <div key={latest?.id ?? 'fallback'} className="mt-0.5 text-[13px] leading-snug text-fg-primary animate-slide-in [&_p]:m-0 [&_p+p]:mt-1.5">
+        {latest ? <Streamdown>{latest.content}</Streamdown> : <p className="text-pretty">{fallbackPrompt}</p>}
+      </div>
+      {earlier.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowEarlier((v) => !v)}
+            aria-expanded={showEarlier}
+            className="mt-2 text-xs text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            {showEarlier ? 'Hide earlier' : `Earlier (${earlier.length})`}
+          </button>
+          {showEarlier && (
+            <ul className="mt-1.5 space-y-1.5 border-t border-accent/15 pt-2">
+              {earlier.map((s) => (
+                <li key={s.id} className="text-xs leading-snug text-fg-secondary [&_p]:m-0">
+                  <Streamdown>{s.content}</Streamdown>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -238,12 +285,15 @@ const EMPTY_BANT: Record<AxisKey, AxisCard> = {
 export function MemoryPanel({
   memory,
   factsUI,
+  suggestions = [],
   className,
   redundantPhrases = [],
   prospectName = 'Prospect',
 }: {
   memory: MeetingMemory | null;
   factsUI?: CallFactsUI | null;
+  /** Live AI coaching suggestions, oldest first. */
+  suggestions?: CoachSuggestion[];
   className?: string;
   redundantPhrases?: string[];
   /** First name used for open-loop owners and the empty-state hint. */
@@ -294,12 +344,10 @@ export function MemoryPanel({
           </p>
         )}
 
-        {pushNext && !nothingYet && (
-          <div className="rounded-lg bg-accent-soft px-3 py-2.5">
-            <div className="text-xs font-semibold text-accent">Ask next</div>
-            <p className="mt-0.5 text-[13px] leading-snug text-fg-primary text-pretty">{pushNext.humanPrompt}</p>
-          </div>
-        )}
+        <NextMoveCard
+          suggestions={suggestions}
+          fallbackPrompt={!nothingYet && pushNext ? pushNext.humanPrompt : null}
+        />
 
         <Section title="Qualification">
           <ul className="divide-y divide-border">

@@ -92,7 +92,7 @@ ENUM LITERALS (case-sensitive): direction = 'positive' | 'negative' (NEVER 'pos'
 
 // Schema the extractor LLM is constrained to. bantRender + relevantFacts are
 // owned by the panel agent now; we strip them from the LLM's output surface.
-const ExtractorOutputSchema = MemoryPatchSchema.omit({
+export const ExtractorOutputSchema = MemoryPatchSchema.omit({
   utteranceId: true,
   turnId: true,
   speaker: true,
