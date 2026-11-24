@@ -63,6 +63,8 @@ describe('suggestion lifecycle', () => {
     const v = deriveView(l, ctx({ axisConfirmed: (t) => t === 'budget' }));
     expect(v.tray).toHaveLength(0);
     expect(v.current?.id).toBe('b');
+    // It shows in history as covered, never with a blank status.
+    expect(v.history.find((s) => s.id === 'a')?.status).toBe('covered');
   });
 
   test('age is only a backstop: old parked questions expire, young ones stay', () => {

@@ -385,6 +385,84 @@ function TrayRow({
   );
 }
 
+// ─── Earlier suggestions (directly under the card) ──────────────────────────
+
+function RestoreIcon() {
+  return (
+    <svg viewBox="0 0 12 12" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.5 5.5a3.5 3.5 0 1 1 1 2.6" />
+      <path d="M2.5 2.5v3h3" />
+    </svg>
+  );
+}
+
+/** How each earlier suggestion left: an icon you can read at a glance, with the word for screen readers. */
+function StatusGlyph({ status }: { status: SuggestionStatus }) {
+  const label = STATUS_LABEL[status] ?? 'Earlier';
+  const icon =
+    status === 'covered' ? <span className="text-signal-positive"><CheckIcon /></span>
+    : status === 'asked' ? <span className="text-fg-secondary"><CheckIcon /></span>
+    : status === 'dropped' ? <span className="text-fg-muted"><CloseIcon /></span>
+    : <span className="block h-1.5 w-1.5 rounded-full bg-fg-muted/60" />;
+  return (
+    <span className="mt-[3px] flex h-3.5 w-3.5 shrink-0 items-center justify-center" title={label}>
+      {icon}
+      <span className="sr-only">{label}:</span>
+    </span>
+  );
+}
+
+/**
+ * Quiet by default: one line under the card. Opens to a short, scrollable list
+ * in the same rhythm as the card, newest first. Any item can be brought back.
+ */
+function EarlierSuggestions({ items, onRestore }: { items: CoachSuggestion[]; onRestore: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-1.5 px-3.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls="earlier-suggestions"
+        className={cn('inline-flex min-h-6 items-center gap-1 rounded text-xs text-fg-secondary transition-colors duration-150 hover:text-fg-primary', FOCUS)}
+      >
+        <svg viewBox="0 0 12 12" className={cn('h-3 w-3 transition-transform duration-150', open && 'rotate-90')} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4.5 2.5 8 6l-3.5 3.5" />
+        </svg>
+        Earlier
+        <span className="tabular-nums text-fg-muted">{items.length}</span>
+      </button>
+      {open && (
+        <ul id="earlier-suggestions" aria-label="Earlier suggestions" className="mt-1 max-h-44 overflow-y-auto pr-1">
+          {items.map((s) => (
+            <li key={s.id} className="group/earlier flex items-start gap-2 py-1.5">
+              <StatusGlyph status={s.status} />
+              <span className="min-w-0 flex-1 text-[13px] leading-snug text-fg-secondary line-clamp-2" title={plain(s.content)}>
+                {plain(s.content)}
+              </span>
+              <button
+                type="button"
+                onClick={() => onRestore(s.id)}
+                aria-label={`Bring back: ${plain(s.content)}`}
+                title="Bring back"
+                className={cn(
+                  '-my-1 w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-md text-fg-secondary transition-[opacity,color,background-color] duration-150 hover:bg-bg-subtle hover:text-fg-primary',
+                  'opacity-0 group-hover/earlier:opacity-100 group-focus-within/earlier:opacity-100 [@media(hover:none)]:opacity-100',
+                  FOCUS,
+                )}
+              >
+                <RestoreIcon />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ─── Record sections ────────────────────────────────────────────────────────
 
 const FACT_CATEGORY_LABEL: Record<RelevantFact['category'], string> = {
@@ -574,7 +652,6 @@ export function MemoryPanel({
   const baseClass = className ?? 'w-[360px] shrink-0 bg-bg-elevated border-l border-border';
   const [scrolled, setScrolled] = useState(false);
   const [allFacts, setAllFacts] = useState(false);
-  const [showEarlier, setShowEarlier] = useState(false);
 
   const bant = (factsUI?.bant ?? EMPTY_BANT) as Record<AxisKey, AxisCard>;
   const certainty = Object.fromEntries(AXIS_KEYS.map((k) => [k, certaintyOf(bant[k])])) as Record<AxisKey, Certainty>;
@@ -643,6 +720,7 @@ export function MemoryPanel({
             onPromote={onPromote}
             onRestore={onRestore}
           />
+          <EarlierSuggestions items={earlier} onRestore={onRestore} />
         </div>
       )}
 
@@ -733,37 +811,6 @@ export function MemoryPanel({
           </Section>
         )}
 
-        {earlier.length > 0 && (
-          <section aria-label="Earlier suggestions">
-            <button
-              type="button"
-              onClick={() => setShowEarlier((v) => !v)}
-              aria-expanded={showEarlier}
-              aria-controls="earlier-suggestions"
-              className={cn('inline-flex min-h-6 items-center gap-1.5 rounded hover:text-fg-primary', HEADING, FOCUS)}
-            >
-              Earlier suggestions
-              <span className="font-normal tabular-nums text-fg-muted">{earlier.length}</span>
-            </button>
-            {showEarlier && (
-              <ul id="earlier-suggestions" className="mt-1">
-                {earlier.map((s) => (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      onClick={() => onRestore(s.id)}
-                      aria-label={`Bring back: ${plain(s.content)}`}
-                      className={cn('-mx-2 grid w-[calc(100%+1rem)] grid-cols-[4.75rem_1fr] gap-x-3 rounded-md px-2 py-1.5 text-left hover:bg-bg-subtle/60', FOCUS)}
-                    >
-                      <span className="pt-px text-xs text-fg-muted">{STATUS_LABEL[s.status] ?? ''}</span>
-                      <span className={cn(BODY, 'text-fg-secondary text-pretty')}>{plain(s.content)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
       </div>
     </aside>
   );

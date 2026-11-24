@@ -41,6 +41,8 @@ EXAMPLES:
 
 DO NOT emit evidence on closing/farewell turns ("thanks", "talk soon", "sounds good let's wrap").
 
+TIMELINE IS THE DEAL'S TIMELINE: when a decision, purchase, start, go-live or deadline happens for what the rep is selling (or the business event driving it, like a board meeting or funding round). It is NEVER about this call: "I've got about twenty-five minutes", "hard stop at two", "can we do Thursday instead" are logistics, not evidence on ANY axis. Emit nothing for them.
+
 DO NOT emit evidence from REP utterances UNLESS the rep is paraphrasing the prospect for confirmation ("So you're saying ~6 hours a week — got it"). The prospect's words are the source of truth.
 
 DECISION GEOGRAPHY — only upsert when ROLE is stated:

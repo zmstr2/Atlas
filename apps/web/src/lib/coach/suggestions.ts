@@ -175,10 +175,12 @@ export function deriveView(list: CoachSuggestion[], ctx: ViewContext): Suggestio
   for (const s of list) {
     if (s.status === 'current') {
       // The current item stays until replaced, unless the call already answered it.
-      if (parkable(s) && answered(s)) history.push(s);
+      if (parkable(s) && answered(s)) history.push({ ...s, status: 'covered' });
       else current = s;
     } else if (s.status === 'open') {
-      if (answered(s) || stale(s)) history.push(s);
+      // Shown in history with why it left, without rewriting the stored item.
+      if (answered(s)) history.push({ ...s, status: 'covered' });
+      else if (stale(s)) history.push({ ...s, status: 'expired' });
       else open.push(s);
     } else {
       if (s.status === 'covered' && s.settledAt !== undefined && ctx.now - s.settledAt < COVERED_FLASH_MS) {
