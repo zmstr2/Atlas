@@ -1,13 +1,27 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CallFactsUI, MeetingMemory, PersonaId, PersonaToolCallEvent, TranscriptEvent, Utterance } from '@atlas/types';
 import { MemoryStore } from '@/lib/memory/store';
 import { HotTail } from '@/lib/memory/hotTail';
 import { buildCallFactsUI } from '@/lib/memory/factsUI';
 import { INTRO_BY_PERSONA } from './intros';
 import type { CallSnapshot, ChatContext, TurnEvent, TurnRequest } from './protocol';
+import {
+  addSuggestion as addToList,
+  COVERED_FLASH_MS,
+  deriveView,
+  markCovered,
+  openForModel,
+  promote as promoteInList,
+  settle,
+  type CoachSuggestion,
+  type SuggestionView,
+} from './suggestions';
 
-export type CoachSuggestion = {
+export type { CoachSuggestion, SuggestionView } from './suggestions';
+
+/** The briefing and call events shown in the chat (not live coaching). */
+export type CoachNote = {
   id: string;
   content: string;
   reason?: string;
@@ -15,10 +29,15 @@ export type CoachSuggestion = {
 };
 
 export type UseCoachReturn = {
-  /** Live coaching, one per turn. Shown in the side panel's "Next move" card. */
-  suggestions: CoachSuggestion[];
-  /** Briefing and call events (e.g. the persona booking a next step). Shown in the chat. */
-  notes: CoachSuggestion[];
+  /** Live coaching for the side panel: current suggestion, "still open" tray, history. */
+  view: SuggestionView;
+  /** Clock used for ages; ticks so "40s" becomes "1m". */
+  now: number;
+  markAsked: (id: string) => void;
+  dropSuggestion: (id: string) => void;
+  promoteSuggestion: (id: string) => void;
+  /** Briefing and call events. Shown in the chat. */
+  notes: CoachNote[];
   memory: MeetingMemory | null;
   factsUI: CallFactsUI | null;
   errors: string[];
@@ -41,20 +60,44 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
   const startedRef = useRef(Date.now());
   const recentRef = useRef<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+  const viewRef = useRef<SuggestionView | null>(null);
 
-  const [suggestions, setSuggestions] = useState<CoachSuggestion[]>([]);
-  const [notes, setNotes] = useState<CoachSuggestion[]>([]);
+  const [all, setAll] = useState<CoachSuggestion[]>([]);
+  const [notes, setNotes] = useState<CoachNote[]>([]);
+  const [turn, setTurn] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   const [memory, setMemory] = useState<MeetingMemory | null>(null);
   const [factsUI, setFactsUI] = useState<CallFactsUI | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
 
-  const addSuggestion = useCallback((s: CoachSuggestion) => {
-    recentRef.current = [...recentRef.current, s.content].slice(-5);
-    setSuggestions((prev) => (prev.some((p) => p.id === s.id) ? prev : [...prev, s]));
+  // Ages ("40s" -> "1m") and the 5-minute backstop need a clock.
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(t);
   }, []);
 
-  const addNote = useCallback((s: CoachSuggestion) => {
-    setNotes((prev) => (prev.some((p) => p.id === s.id) ? prev : [...prev, s]));
+  /** Re-render shortly after something settles so "Covered" can fade away. */
+  const bumpClockSoon = useCallback(() => {
+    setNow(Date.now());
+    setTimeout(() => setNow(Date.now()), COVERED_FLASH_MS + 60);
+  }, []);
+
+  const view = useMemo(
+    () =>
+      deriveView(all, {
+        now,
+        turn,
+        axisConfirmed: (topic) => {
+          const card = (factsUI?.bant as Record<string, { state?: string; headline?: string | null }> | undefined)?.[topic];
+          return !!card && card.state === 'firm' && !!card.headline;
+        },
+      }),
+    [all, now, turn, factsUI],
+  );
+  viewRef.current = view;
+
+  const addNote = useCallback((n: CoachNote) => {
+    setNotes((prev) => (prev.some((p) => p.id === n.id) ? prev : [...prev, n]));
   }, []);
 
   const publishMemory = useCallback(() => {
@@ -63,7 +106,7 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
     setFactsUI(buildCallFactsUI(snap));
   }, []);
 
-  // Fresh state per call, plus the coach's opening message.
+  // Fresh state per call, plus the coach's opening briefing in the chat.
   useEffect(() => {
     if (!callId || !personaId) return;
     storeRef.current = new MemoryStore();
@@ -71,8 +114,9 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
     turnRef.current = 0;
     startedRef.current = Date.now();
     recentRef.current = [];
-    setSuggestions([]);
+    setAll([]);
     setNotes([]);
+    setTurn(0);
     setMemory(null);
     setFactsUI(null);
     setErrors([]);
@@ -83,8 +127,22 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
 
   const applyEvent = useCallback((e: TurnEvent) => {
     switch (e.type) {
-      case 'suggestion':
-        addSuggestion({ id: e.id, content: e.content, reason: e.reason, ts: Date.now() });
+      case 'suggestion': {
+        const at = Date.now();
+        recentRef.current = [...recentRef.current, e.content].slice(-5);
+        setAll((prev) =>
+          addToList(
+            prev,
+            { id: e.id, content: e.content, why: e.why, kind: e.kind, topic: e.topic, reason: e.reason, ts: at, turn: turnRef.current },
+            at,
+          ),
+        );
+        setNow(at);
+        break;
+      }
+      case 'covered':
+        setAll((prev) => markCovered(prev, e.ids, Date.now()));
+        bumpClockSoon();
         break;
       case 'memory.patch':
         storeRef.current.applyMemoryPatch(e.patch);
@@ -97,7 +155,7 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
         setErrors((prev) => [...prev, e.message]);
         break;
     }
-  }, [addSuggestion, publishMemory]);
+  }, [bumpClockSoon, publishMemory]);
 
   const sendTranscript = useCallback((event: TranscriptEvent) => {
     // Only finalized, non-empty utterances drive the pipeline.
@@ -120,6 +178,7 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
     tailRef.current.push(utterance);
     storeRef.current.recordUtteranceStats(speaker, event.text);
     turnRef.current += 1;
+    setTurn(turnRef.current);
 
     const snapshot: CallSnapshot = {
       memory: storeRef.current.snapshot,
@@ -132,6 +191,7 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
       turnId: `t${String(turnRef.current).padStart(3, '0')}`,
       utterance: { id: utterance.id, speaker, text: event.text },
       elapsedMs,
+      openSuggestions: viewRef.current ? openForModel(viewRef.current) : [],
       snapshot,
     };
 
@@ -186,6 +246,18 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
     abortRef.current = null;
   }, []);
 
+  const markAsked = useCallback((id: string) => {
+    setAll((prev) => settle(prev, id, 'asked', Date.now()));
+    bumpClockSoon();
+  }, [bumpClockSoon]);
+  const dropSuggestion = useCallback((id: string) => {
+    setAll((prev) => settle(prev, id, 'dropped', Date.now()));
+    bumpClockSoon();
+  }, [bumpClockSoon]);
+  const promoteSuggestion = useCallback((id: string) => {
+    setAll((prev) => promoteInList(prev, id, Date.now()));
+  }, []);
+
   const getChatContext = useCallback((): ChatContext => ({
     personaId: (personaId ?? 'mia') as PersonaId,
     memory: storeRef.current.snapshot,
@@ -193,5 +265,9 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
     suggestions: recentRef.current,
   }), [personaId]);
 
-  return { suggestions, notes, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall, getChatContext };
+  return {
+    view, now, markAsked, dropSuggestion, promoteSuggestion,
+    notes, memory, factsUI, errors,
+    sendTranscript, sendPersonaToolCall, endCall, getChatContext,
+  };
 }

@@ -54,7 +54,12 @@ TIMELINE axis is ONLY about the deal-closing or solution-go-live timeline — wh
 
 DO NOT INVENT. Every concrete token in the headline or detail must trace to a verbatim or to a fact in the input. If the evidence is too thin to write a real headline, set headline=null. Do not fabricate to fill space.
 
-RELEVANT FACTS (≤4 total): non-BANT context that genuinely shapes the rep's next move. Re-rank from scratch each call — this is NOT an append. Categories: stack (tools/systems), metric (numbers/KPIs not on a BANT axis), trigger (events driving urgency), competitor (named alternatives), commitment (rep promises), process (buying-process steps the rep needs to navigate). Each ≤10 words, factual, no filler. If nothing rises to "the rep needs this in their working set," return fewer than 4 — even zero. Never pad.`;
+RELEVANT FACTS (≤4 total): non-BANT context that genuinely shapes the rep's next move. Re-rank from scratch each call — this is NOT an append. Categories: stack (tools/systems), metric (numbers/KPIs not on a BANT axis), trigger (events driving urgency), competitor (named alternatives), commitment (rep promises), process (buying-process steps the rep needs to navigate). Each ≤10 words, factual, no filler. If nothing rises to "the rep needs this in their working set," return fewer than 4 — even zero. Never pad.
+
+WORDING RULES
+- BANT headline and detail: sentence case, no trailing period, plain words. State what the prospect actually said about that axis. If it is negative (not a priority, no budget, no authority) say so plainly; never dress it up.
+- Never repeat in RELEVANT FACTS anything already stated in a BANT headline or detail (for example an approval threshold).
+- Category "process" means HOW they buy, approve or evaluate (steps, approvers, reviews, vendors). Priorities, goals and plans are NOT process: use "trigger" for what is driving urgency and "metric" for a measured number.`;
 
 export async function runPanelAgent(opts: {
   memory: MeetingMemory;

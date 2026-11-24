@@ -4,6 +4,7 @@ import { llmGenerateObject } from '../llm/wrapper';
 import { renderMemoryMarkdown } from '@/lib/memory/render';
 import { detectAnchorContradictions } from '@/lib/memory/anchors';
 import type { HotTailEntry } from '@/lib/memory/hotTail';
+import { formatOpen, type OpenSuggestion } from './openSuggestions';
 
 const SYSTEM = `You are Atlas's rep coach, watching a live sales call. You see the rep's latest utterance and decide whether to fire ONE correction. Most rep turns are fine — silence is correct.
 
@@ -41,6 +42,10 @@ If you cannot name all three concretely, shouldFire=false. "Could be sharper" is
 - agent: always 'rep_watcher'.
 - play: closest rep_* label from the taxonomy below.
 - groundedInUtteranceIds: cite the rep's utteranceId.
+- say: the exact words the rep could say to repair or redirect, ONE natural spoken sentence, ≤18 words. Empty string when shouldFire=false.
+- why: ≤12 words on what it fixes. Empty string when shouldFire=false.
+- kind: always 'note' for rep corrections.
+- coveredIds: ids from OPEN SUGGESTIONS whose question the rep has now asked in the NEW REP UTTERANCE (or that the prospect already answered in recent turns). Use [] when none. Required even when shouldFire=false.
 
 # Play taxonomy (labels only)
 rep_leading_question | rep_feature_dump | rep_premature_discount | rep_missed_buying_signal | rep_skipped_drill | rep_defended_objection | rep_off_ladder | rep_no_next_step | rep_pitched_outside_anchor | correct_contradiction`;
@@ -50,8 +55,9 @@ export async function runRepWatcher(opts: {
   hotTail: HotTailEntry[];
   prevMemory: MeetingMemory;
   brief: PreCallBrief;
+  openSuggestions?: OpenSuggestion[];
 }): Promise<Suggestion> {
-  const { utterance, hotTail, prevMemory, brief } = opts;
+  const { utterance, hotTail, prevMemory, brief, openSuggestions = [] } = opts;
 
   const memoryMarkdown = renderMemoryMarkdown({
     memory: prevMemory,
@@ -72,6 +78,9 @@ ${memoryMarkdown}
 
 # IMMEDIATE PRIOR PROSPECT UTTERANCE (was the rep's response appropriate?)
 ${priorProspect ? `[${priorProspect.id}] PROSPECT: ${priorProspect.text}` : '(none)'}
+
+# OPEN SUGGESTIONS (earlier questions not yet seen asked or answered)
+${formatOpen(openSuggestions)}
 
 # NEW REP UTTERANCE
 [${utterance.id}] REP: ${utterance.text}

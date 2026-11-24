@@ -25,6 +25,12 @@ export const TurnRequestSchema = z.object({
     text: z.string().min(1).max(4000),
   }),
   elapsedMs: z.number().nonnegative(),
+  // Suggestions parked in the rep's tray, so the model can say which the latest turn covered.
+  openSuggestions: z.array(z.object({
+    id: z.string().max(128),
+    say: z.string().max(400),
+    topic: z.string().max(40),
+  })).max(8).default([]),
   // Shape is produced by our own MemoryStore; not worth re-validating field by field.
   snapshot: z.object({
     memory: z.unknown(),
@@ -36,7 +42,20 @@ export type TurnRequest = Omit<z.infer<typeof TurnRequestSchema>, 'snapshot'> & 
 
 /** One JSON object per line in the /api/coach/turn response. */
 export type TurnEvent =
-  | { type: 'suggestion'; id: string; content: string; reason?: string; groundedInUtteranceIds?: string[] }
+  | {
+      type: 'suggestion';
+      id: string;
+      /** What the rep can say next (falls back to the long-form markdown). */
+      content: string;
+      /** One line on why. */
+      why?: string;
+      kind: 'question' | 'note';
+      /** Qualification axis or loop this relates to, '' when general. */
+      topic: string;
+      reason?: string;
+      groundedInUtteranceIds?: string[];
+    }
+  | { type: 'covered'; ids: string[] }
   | { type: 'memory.patch'; patch: MemoryPatch }
   | { type: 'panel.patch'; patch: PanelPatch; turnId: string }
   | { type: 'error'; message: string };

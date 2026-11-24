@@ -30,7 +30,11 @@ mock.module('../llm/wrapper', () => ({
         return {
           shouldFire: true, priority: 'nudge', play: 'none', axis: null,
           markdown: 'Ask how they got to $40k.', reasoning: 'budget surfaced',
-          groundedInUtteranceIds: ['u1'],
+          groundedInUtteranceIds: ['u1'], groundedInAnchorTurnIds: [],
+          say: 'How did you arrive at forty thousand, and who signed off on it?',
+          why: 'Tests whether the number is real', kind: 'question',
+          // one real open id, one the model invented
+          coveredIds: ['open-1', 'invented'],
         };
     }
   },
@@ -49,6 +53,7 @@ function makeRequest(speaker: 'rep' | 'customer'): TurnRequest {
   return {
     callId: 'call_test', personaId: 'mia', turnId: 't001', elapsedMs: 1000,
     utterance: { id: 'u1', speaker, text: 'We have about forty thousand set aside.' },
+    openSuggestions: [{ id: 'open-1', say: 'Who else signs off?', topic: 'authority' }],
     snapshot: { memory: store.snapshot, stats: store.getStats(), hotTail: tail.snapshot() },
   };
 }
@@ -67,7 +72,17 @@ describe('runTurn (stateless coach turn)', () => {
     expect(events.some((e) => e.type === 'error')).toBe(false);
 
     const sug = events.find((e) => e.type === 'suggestion');
-    expect(sug && sug.type === 'suggestion' && sug.content).toBe('Ask how they got to $40k.');
+    // The rep reads `say`, not the long-form markdown; topic and kind ride along.
+    expect(sug && sug.type === 'suggestion' && sug.content).toBe('How did you arrive at forty thousand, and who signed off on it?');
+    expect(sug && sug.type === 'suggestion' && sug.kind).toBe('question');
+    expect(sug && sug.type === 'suggestion' && sug.why).toBe('Tests whether the number is real');
+  });
+
+  test('reports covered ids, ignoring ids that were never open', async () => {
+    const events: TurnEvent[] = [];
+    await runTurn(makeRequest('customer'), (e) => events.push(e));
+    const covered = events.find((e) => e.type === 'covered');
+    expect(covered && covered.type === 'covered' && covered.ids).toEqual(['open-1']);
   });
 
   test('patches applied client-side reproduce the memory the server computed', async () => {

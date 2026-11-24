@@ -33,6 +33,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<RealtimeSessionInfo | null>(null);
   const [muted, setMuted] = useState(false);
+  const [leftUnasked, setLeftUnasked] = useState<string[]>([]);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [resizing, setResizing] = useState(false);
@@ -76,7 +77,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     window.addEventListener('pointerup', onUp);
   };
 
-  const { suggestions, notes, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall: coachEndCall, getChatContext } = useCoach({ callId, personaId });
+  const { view, now, markAsked, dropSuggestion, promoteSuggestion, notes, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall: coachEndCall, getChatContext } = useCoach({ callId, personaId });
 
   useEffect(() => {
     let cancelled = false;
@@ -162,6 +163,13 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
       persona_id: personaId,
       duration_seconds: Math.round((Date.now() - callStartRef.current) / 1000),
     });
+    // Questions still worth asking become the post-call "Left unasked" recap.
+    setLeftUnasked(
+      [view.current, ...view.tray]
+        .filter((s): s is NonNullable<typeof s> => !!s && s.kind === 'question')
+        .slice(0, 4)
+        .map((s) => s.content.replace(/[*_`]/g, '').trim()),
+    );
     coachEndCall();
     realtimeRef.current?.hangup();
     realtimeRef.current = null;
@@ -204,6 +212,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     return (
       <PostCallRating
         personaName={session?.persona.displayName ?? 'Jordan Hayes'}
+        leftUnasked={leftUnasked}
         onDone={onEnd}
       />
     );
@@ -263,7 +272,11 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
             <MemoryPanel
               memory={memory}
               factsUI={factsUI}
-              suggestions={suggestions}
+              view={view}
+              now={now}
+              onAsked={markAsked}
+              onDrop={dropSuggestion}
+              onPromote={promoteSuggestion}
               className="w-full bg-white"
               redundantPhrases={[
                 session?.persona.displayName ?? '',

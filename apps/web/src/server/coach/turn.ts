@@ -15,6 +15,7 @@ import { BRIEFS } from './context';
  */
 export async function runTurn(req: TurnRequest, emit: (e: TurnEvent) => void): Promise<void> {
   const brief = BRIEFS[req.personaId];
+  const open = req.openSuggestions ?? [];
   const { utterance: u, turnId } = req;
 
   const utterance: Utterance = {
@@ -35,8 +36,8 @@ export async function runTurn(req: TurnRequest, emit: (e: TurnEvent) => void): P
 
   const suggesterPromise =
     utterance.speaker === 'customer'
-      ? runProspectSuggester({ utterance, hotTail: tail, prevMemory, brief })
-      : runRepWatcher({ utterance, hotTail: tail, prevMemory, brief });
+      ? runProspectSuggester({ utterance, hotTail: tail, prevMemory, brief, openSuggestions: open })
+      : runRepWatcher({ utterance, hotTail: tail, prevMemory, brief, openSuggestions: open });
 
   const memoryDone = runMemoryAgent({ utterance, turnId, prevMemory, hotTail: tail })
     .then(async (patch) => {
@@ -59,11 +60,21 @@ export async function runTurn(req: TurnRequest, emit: (e: TurnEvent) => void): P
 
   try {
     const suggestion = await suggesterPromise;
+
+    // Only ids we actually sent can be covered; ignore anything the model invents.
+    const known = new Set(open.map((o) => o.id));
+    const covered = suggestion.coveredIds.filter((id) => known.has(id));
+    if (covered.length) emit({ type: 'covered', ids: covered });
+
     if (suggestion.shouldFire) {
       emit({
         type: 'suggestion',
         id: `s-${u.id}`,
-        content: suggestion.markdown,
+        // `say` is what the rep reads; fall back to the older one-line markdown.
+        content: suggestion.say.trim() || suggestion.markdown,
+        why: suggestion.why.trim() || undefined,
+        kind: suggestion.kind,
+        topic: suggestion.axis ?? '',
         reason: suggestion.reasoning,
         groundedInUtteranceIds: suggestion.groundedInUtteranceIds,
       });

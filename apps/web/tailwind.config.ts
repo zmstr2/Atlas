@@ -60,7 +60,7 @@ const config: Config = {
         'slide-in': 'slide-in 240ms ease-out forwards',
         'atlas-pulse': 'pulse 1.6s ease-in-out infinite',
         // Marks a memory item that just changed; fades out on its own.
-        'atlas-flash': 'atlas-flash 1.6s cubic-bezier(0.22, 1, 0.36, 1)',
+        'atlas-flash': 'atlas-flash 4s cubic-bezier(0.22, 1, 0.36, 1)',
       },
     },
   },

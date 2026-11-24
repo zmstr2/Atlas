@@ -80,6 +80,14 @@ export const SuggestionSchema = z.object({
     if (typeof v !== 'string') { coercionCounts.grounded_ids_coerce++; return String(v); }
     return v;
   }, z.string())).default([]),
+  // What the rep can actually say next (<=18 words), why it matters, and how
+  // long it stays useful. 'question' = still worth asking later if skipped;
+  // 'note' = a reaction tied to this moment. coveredIds = earlier open
+  // suggestions this turn asked or answered.
+  say: z.string().default(''),
+  why: z.string().default(''),
+  kind: z.enum(['question', 'note']).default('note'),
+  coveredIds: z.array(z.string()).default([]),
 });
 export type Suggestion = z.infer<typeof SuggestionSchema>;
 
@@ -96,6 +104,10 @@ export const SuggestionOutputSchema = z.object({
   reasoning: z.string(),
   groundedInUtteranceIds: z.array(z.string()),
   groundedInAnchorTurnIds: z.array(z.string()),
+  say: z.string(),
+  why: z.string(),
+  kind: z.enum(['question', 'note']),
+  coveredIds: z.array(z.string()),
 });
 export type SuggestionOutput = z.infer<typeof SuggestionOutputSchema>;
 

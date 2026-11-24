@@ -178,12 +178,12 @@ function CoachErrorNotice({ errors }: { errors: string[] }) {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="text-[11px] text-fg-muted hover:text-fg-secondary underline-offset-2 hover:underline"
+          className="text-xs text-fg-secondary hover:text-fg-primary underline-offset-2 hover:underline"
         >
           {open ? 'Hide details' : 'Details'}
         </button>
         {open && (
-          <pre className="mt-1 p-2 rounded bg-bg-subtle text-[10px] text-fg-muted whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+          <pre className="mt-1 p-2 rounded bg-bg-subtle text-xs text-fg-secondary whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
             {latest}
           </pre>
         )}

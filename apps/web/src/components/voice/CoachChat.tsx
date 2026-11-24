@@ -4,7 +4,7 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Streamdown } from 'streamdown';
 import { LeadResultCard, CompanyResultCard, ContactResultCard, ToolErrorCard } from './CRMCard';
-import type { CoachSuggestion } from '@/lib/coach/useCoach';
+import type { CoachNote } from '@/lib/coach/useCoach';
 import type { ChatContext } from '@/lib/coach/protocol';
 import { cn } from '@/lib/cn';
 
@@ -21,7 +21,7 @@ export function CoachChat({
 }: {
   getChatContext: () => ChatContext;
   /** Atlas's briefing and call events. Live coaching suggestions are in the side panel. */
-  notes: CoachSuggestion[];
+  notes: CoachNote[];
   title?: string;
 }) {
   // The server is stateless, so every message carries the call's current context.
@@ -42,7 +42,7 @@ export function CoachChat({
   }, [messages, notes]);
 
   const items: Array<
-    | { kind: 'suggestion'; suggestion: CoachSuggestion; ts: number }
+    | { kind: 'suggestion'; suggestion: CoachNote; ts: number }
     | { kind: 'message'; message: UIMessage; ts: number }
   > = [];
   for (const s of notes) {
@@ -66,7 +66,7 @@ export function CoachChat({
           <div className="text-sm font-semibold text-fg-primary truncate leading-snug">
             {title ?? 'Atlas'}
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-fg-muted">
+          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-fg-muted">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal-positive animate-atlas-pulse shrink-0" aria-hidden="true" />
             Watching live
           </div>
@@ -150,10 +150,10 @@ export function CoachChat({
 }
 
 // Atlas-originated suggestion — markdown rendered, no bubble, label above
-function SuggestionMessage({ suggestion }: { suggestion: CoachSuggestion }) {
+function SuggestionMessage({ suggestion }: { suggestion: CoachNote }) {
   return (
     <div className="mr-12 animate-slide-in space-y-1">
-      <div className="text-[11px] font-semibold text-fg-muted tracking-wide">Atlas</div>
+      <div className="text-xs font-semibold text-fg-muted tracking-wide">Atlas</div>
       <div className="text-sm text-fg-primary leading-relaxed">
         <Streamdown>{suggestion.content}</Streamdown>
       </div>
@@ -177,7 +177,7 @@ function MessageRow({ message }: { message: UIMessage }) {
 
   return (
     <div className="mr-12 animate-slide-in space-y-1">
-      <div className="text-[11px] font-semibold text-fg-muted tracking-wide">Atlas</div>
+      <div className="text-xs font-semibold text-fg-muted tracking-wide">Atlas</div>
       <div className="text-sm text-fg-primary leading-relaxed">
         {message.parts.map((part, i) => renderPart(part, i, 'assistant'))}
       </div>
@@ -205,7 +205,7 @@ function renderPart(part: UIMessage['parts'][number], key: number, role: 'user' 
         return (
           <details key={key} className="text-xs">
             <summary className="text-fg-muted cursor-pointer">{part.type}</summary>
-            <pre className="text-[10px] overflow-x-auto">{JSON.stringify(part, null, 2)}</pre>
+            <pre className="text-xs overflow-x-auto">{JSON.stringify(part, null, 2)}</pre>
           </details>
         );
       }

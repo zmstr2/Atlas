@@ -4,6 +4,7 @@ import { llmGenerateObject } from '../llm/wrapper';
 import { renderMemoryMarkdown } from '@/lib/memory/render';
 import { detectAnchorContradictions } from '@/lib/memory/anchors';
 import type { HotTailEntry } from '@/lib/memory/hotTail';
+import { formatOpen, type OpenSuggestion } from './openSuggestions';
 
 const SYSTEM = `You are Atlas's discovery co-pilot, watching a live sales call. You see the prospect's latest utterance and decide whether to fire ONE suggestion to the rep. Most prospect turns produce no suggestion — silence is the default.
 
@@ -65,6 +66,10 @@ If you cannot name all three concretely, shouldFire=false. Greetings, transition
 - agent: always 'prospect_suggester'.
 - play: closest label from the taxonomy below — used for analytics, not for firing.
 - groundedInUtteranceIds + groundedInAnchorTurnIds: cite the evidence named in (b).
+- say: the exact words the rep could say next, as ONE natural spoken sentence, ≤18 words, using the prospect's own specifics. A question when possible ("If Dana needs payback in nine months, what would you want to see first?"). Never advice about advice ("Correct the mismatch…", "Clarify the budget…"). Empty string when shouldFire=false.
+- why: ≤12 words on what this gets the rep. Empty string when shouldFire=false.
+- kind: 'question' when \`say\` asks something that stays worth asking later if the rep skips it now; 'note' for a reaction, correction or warning tied to this moment.
+- coveredIds: ids from OPEN SUGGESTIONS whose question the rep has now asked or the prospect has now answered (judge from the NEW utterance and the recent turns). Use [] when none. Required even when shouldFire=false.
 
 # Play taxonomy (labels only)
 drill_vague | quantify_pain | probe_stakeholder | reframe_objection | surface_value_prop | competitor_handle | push_next_axis | trial_close | multi_thread | anchor_next_step | qualify_out | correct_contradiction | surface_status_quo_cost | develop_champion`;
@@ -74,8 +79,9 @@ export async function runProspectSuggester(opts: {
   hotTail: HotTailEntry[];
   prevMemory: MeetingMemory;
   brief: PreCallBrief;
+  openSuggestions?: OpenSuggestion[];
 }): Promise<Suggestion> {
-  const { utterance, hotTail, prevMemory, brief } = opts;
+  const { utterance, hotTail, prevMemory, brief, openSuggestions = [] } = opts;
 
   const memoryMarkdown = renderMemoryMarkdown({
     memory: prevMemory,
@@ -106,6 +112,9 @@ Product snippets (for surface_value_prop play): ${productSnippets}
 
 # IMMEDIATE PRIOR REP UTTERANCE (for short-answer interpretation)
 ${priorRep ? `[${priorRep.id}] REP: ${priorRep.text}` : '(none)'}
+
+# OPEN SUGGESTIONS (earlier questions not yet seen asked or answered)
+${formatOpen(openSuggestions)}
 
 # NEW PROSPECT UTTERANCE
 [${utterance.id}] PROSPECT: ${utterance.text}
