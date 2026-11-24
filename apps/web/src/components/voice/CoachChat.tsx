@@ -4,25 +4,32 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Streamdown } from 'streamdown';
 import { LeadResultCard, CompanyResultCard, ContactResultCard, ToolErrorCard } from './CRMCard';
-import type { CoachSuggestion } from '@/lib/coach/ws';
+import type { CoachNote } from '@/lib/coach/useCoach';
+import type { ChatContext } from '@/lib/coach/protocol';
 import { cn } from '@/lib/cn';
 
-const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:3001';
+const STARTER_QUESTIONS = [
+  "What does Mia care about most this year?",
+  "Who else would be involved in a decision?",
+  "What should I ask first?",
+];
 
 export function CoachChat({
-  callId,
-  suggestions,
+  getChatContext,
+  notes,
   title,
 }: {
-  callId: string;
-  suggestions: CoachSuggestion[];
+  getChatContext: () => ChatContext;
+  /** Atlas's briefing and call events. Live coaching suggestions are in the side panel. */
+  notes: CoachNote[];
   title?: string;
 }) {
+  // The server is stateless, so every message carries the call's current context.
   const transport = useMemo(() =>
     new DefaultChatTransport<UIMessage>({
-      api: `${AGENT_URL}/chat`,
-      headers: { 'X-Call-Id': callId },
-    }), [callId]);
+      api: '/api/chat',
+      body: () => ({ context: getChatContext() }),
+    }), [getChatContext]);
 
   const { messages, sendMessage, status } = useChat<UIMessage>({ transport });
 
@@ -32,13 +39,13 @@ export function CoachChat({
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, suggestions]);
+  }, [messages, notes]);
 
   const items: Array<
-    | { kind: 'suggestion'; suggestion: CoachSuggestion; ts: number }
+    | { kind: 'suggestion'; suggestion: CoachNote; ts: number }
     | { kind: 'message'; message: UIMessage; ts: number }
   > = [];
-  for (const s of suggestions) {
+  for (const s of notes) {
     items.push({ kind: 'suggestion', suggestion: s, ts: s.ts });
   }
   for (const m of messages) {
@@ -59,7 +66,7 @@ export function CoachChat({
           <div className="text-sm font-semibold text-fg-primary truncate leading-snug">
             {title ?? 'Atlas'}
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-fg-muted">
+          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-fg-muted">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal-positive animate-atlas-pulse shrink-0" aria-hidden="true" />
             Watching live
           </div>
@@ -82,6 +89,20 @@ export function CoachChat({
           ) : (
             <MessageRow key={item.message.id} message={item.message} />
           )
+        )}
+        {messages.length === 0 && (
+          <div className="flex flex-wrap gap-2" aria-label="Suggested questions">
+            {STARTER_QUESTIONS.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => void sendMessage({ text: q })}
+                className="rounded-full border border-border bg-white px-3 py-1.5 text-[13px] text-fg-secondary transition-colors duration-150 hover:bg-bg-subtle hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         )}
         {status === 'streaming' && (
           <div className="flex items-center gap-2 text-fg-muted text-sm">
@@ -111,7 +132,7 @@ export function CoachChat({
         >
           <input
             className="flex-1 bg-transparent text-sm text-fg-primary placeholder:text-fg-muted focus:outline-none"
-            placeholder="Ask Atlas about this call…"
+            placeholder="Ask about Mia, her company, or what to say…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
@@ -129,10 +150,10 @@ export function CoachChat({
 }
 
 // Atlas-originated suggestion — markdown rendered, no bubble, label above
-function SuggestionMessage({ suggestion }: { suggestion: CoachSuggestion }) {
+function SuggestionMessage({ suggestion }: { suggestion: CoachNote }) {
   return (
     <div className="mr-12 animate-slide-in space-y-1">
-      <div className="text-[11px] font-semibold text-fg-muted tracking-wide">Atlas</div>
+      <div className="text-xs font-semibold text-fg-muted tracking-wide">Atlas</div>
       <div className="text-sm text-fg-primary leading-relaxed">
         <Streamdown>{suggestion.content}</Streamdown>
       </div>
@@ -156,7 +177,7 @@ function MessageRow({ message }: { message: UIMessage }) {
 
   return (
     <div className="mr-12 animate-slide-in space-y-1">
-      <div className="text-[11px] font-semibold text-fg-muted tracking-wide">Atlas</div>
+      <div className="text-xs font-semibold text-fg-muted tracking-wide">Atlas</div>
       <div className="text-sm text-fg-primary leading-relaxed">
         {message.parts.map((part, i) => renderPart(part, i, 'assistant'))}
       </div>
@@ -184,7 +205,7 @@ function renderPart(part: UIMessage['parts'][number], key: number, role: 'user' 
         return (
           <details key={key} className="text-xs">
             <summary className="text-fg-muted cursor-pointer">{part.type}</summary>
-            <pre className="text-[10px] overflow-x-auto">{JSON.stringify(part, null, 2)}</pre>
+            <pre className="text-xs overflow-x-auto">{JSON.stringify(part, null, 2)}</pre>
           </details>
         );
       }

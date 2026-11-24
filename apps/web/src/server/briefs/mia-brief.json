@@ -1,0 +1,77 @@
+{
+  "lead": {
+    "name": "Mia Chen",
+    "title": "Cofounder & CEO",
+    "company": "Kestrel",
+    "companySize": "46 employees, Series A ($16M)"
+  },
+  "avaContext": {
+    "campaignId": "growth-stage-founder-discovery",
+    "leadScore": 0.7,
+    "scoringSignals": [
+      {
+        "signal": "Series A closed 14 months ago ($16M): budget exists and a Series B is coming",
+        "weight": 0.3
+      },
+      {
+        "signal": "Hiring from 46 to ~65 people: growth-stage buying window",
+        "weight": 0.25
+      },
+      {
+        "signal": "Enterprise push (SOC 2, SSO) announced: active, funded initiative",
+        "weight": 0.2
+      },
+      {
+        "signal": "CEO is hands-on in deals and approves small purchases directly",
+        "weight": 0.15
+      },
+      {
+        "signal": "Replied to cold note the same day",
+        "weight": 0.1
+      }
+    ]
+  },
+  "pastInteractions": [
+    {
+      "type": "email",
+      "date": "2026-11-12",
+      "summary": "Short note referencing Kestrel's enterprise-features announcement. Mia replied the same day and offered 25 minutes."
+    }
+  ],
+  "callGoal": "Run real discovery with Mia. Find out which of her goals this year (ARR growth, moving up-market, hiring, support, finance) your product actually moves, quantify it, and agree a concrete next step with the right person. Don't pitch before you've heard her priorities.",
+  "suggestedQuestions": [
+    "What has to be true by the end of the year for you to call it a good year?",
+    "If you had to pick one thing that's holding the business back right now, what is it?",
+    "What's on your plate that only you can do, and what would you hand off tomorrow if you could?",
+    "How would a decision like this get made here: who's involved, and how long does it usually take?",
+    "What have you tried so far, and why isn't it enough?",
+    "What would make this a clear yes in the next quarter, and what would make it a no?"
+  ],
+  "productSnippets": [
+    "The rep sells their own product. Ground every suggestion in what the rep has actually said about it; never invent product facts, pricing or customer names."
+  ],
+  "icp": {
+    "dealShape": "Depends on what the rep sells. Typical for a Series A startup: a scoped pilot or annual contract of roughly $10K-$100K. Up to $15K the CEO approves alone; $15K-$60K also needs the head of finance; above $60K the board is informed.",
+    "cycleLength": "2-6 weeks when it maps to a top-three goal and needs no engineering work. 2-3 months when it touches customer data (security review) or needs engineering integration.",
+    "buyerPersona": "Founder-CEO of a growth-stage B2B startup. Direct, time-poor, numbers-driven, accountable to a board. Delegates evaluation to the owner of the affected function but keeps the final say. Allergic to buzzwords.",
+    "decisionMakerCount": "2-4: Mia (final say), Dana Okafor (finance, above $15K), Raj Patel (CTO: anything touching customer data or engineering time), plus the functional owner (e.g. Leah Brandt for customer success).",
+    "competitiveLandscape": "The status quo is the main competitor: spreadsheets, in-house scripts, a tool already in place, or simply 'not this year'. Direct vendors come second.",
+    "valueFrame": "Mia buys outcomes tied to the board's metrics: ARR growth, net revenue retention, hiring velocity, enterprise readiness, gross margin. She avoids anything that costs engineering time. Frame value as payback in months and hours of her team's time saved or spent.",
+    "buyingSignals": [
+      "Names one of her goals with a number or deadline ('we need $12M ARR by year end', 'SOC 2 Type II window opens next quarter')",
+      "Asks how a decision like this would be made, or says who else she'd need to bring in (Raj, Dana)",
+      "Asks what it replaces and what it needs from her team: she's already weighing implementation",
+      "Asks for a reference from a company her size, or what the first 30-60-90 days look like",
+      "Asks about a pilot under her own approval limit, or about security review timing",
+      "Volunteers the budget pool or timing constraint after the rep ties the offer to ARR, retention, enterprise readiness or hiring"
+    ],
+    "objectionRoots": [
+      "'No engineering bandwidth' surfaces as a blocker; the root is usually unscoped implementation. Quantify her team's hours (ideally near zero) instead of defending the product.",
+      "'Budgets are set' surfaces as timing; the root is usually that the offer isn't yet tied to a board metric. Connect it to ARR, retention, enterprise readiness or hiring and ask about the H2 reallocation path.",
+      "'How is this different from what we do today?' surfaces as competition; the root is the status quo. Ask what she does today and what it costs her, then compare.",
+      "'Dana will want payback in nine months' surfaces as price; the root is an unquantified outcome. Help her build the payback math with her own numbers.",
+      "'Not a priority this year' surfaces as need; the root is usually that the rep hasn't linked it to one of her top three goals. Ask which goal is most at risk and revisit."
+    ],
+    "goodNextStep": "A scoped pilot or working session under her approval limit, with a named success measure and date, OR a call that includes the right second stakeholder (Dana for payback math, Raj for security and technical review). 'Send me more info' and 'let me think about it' without a dated follow-up are loss signals."
+  }
+}

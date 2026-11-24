@@ -6,7 +6,7 @@
 
 **A live coach for sales calls.** Atlas listens to a discovery call as it happens and, in real time, suggests what the rep should say next, tracks what has actually been learned about the deal, and flags what is still missing.
 
-> 🎯 **Try it:** open the demo, click **Join Zoom** on the highlighted calendar event, and talk to an AI prospect (a skeptical startup CTO) with Atlas coaching you on the side. You need a microphone and a desktop browser. Calls are capped at 5 minutes.
+> 🎯 **Try it:** open the demo, click **Join now** on the Meet-style screen, and talk to an AI prospect (Mia, the CEO of a growing startup) with Atlas coaching you on the side. Pitch whatever you want: she doesn't know what you're selling until you say, so it works for any product or service. You need a microphone and a desktop browser. Calls are capped at 5 minutes.
 >
 > **Live demo:** _add your deployed URL here_
 
@@ -15,67 +15,70 @@
 | Area | What it does |
 |---|---|
 | **Voice prospect** | An AI persona (OpenAI Realtime, over WebRTC) with its own agenda, backstory and mood that shifts with how good your questions are. |
-| **Coach chat** | Streams suggestions as the conversation unfolds, grounded in what the prospect actually said. |
+| **Coach chat** | Shows suggestions as the conversation unfolds, grounded in what the prospect actually said. You can also ask it questions. |
 | **Live deal memory** | A structured side panel (BANT / MEDDIC style) that fills in as facts, concerns and commitments surface, each traced back to the exact utterance. |
 | **Post-call rating** | A short feedback step when you hang up. |
 
-There is also a no-microphone mode: [`/scripted`](apps/web/src/app/scripted/page.tsx) replays pre-recorded calls through the same pipeline so you can watch Atlas work without talking.
-
 ## How it works
+
+One Next.js app, deployed as a single Vercel project. No separate backend, no database.
 
 ```
 Browser ──WebRTC audio──► OpenAI Realtime (the prospect's voice)
    │  ▲
-   │  └── short-lived client secret ◄── POST /realtime/session ──┐
-   │                                                              │
-   ├── transcript events ──WebSocket──► Atlas agent (Bun + Hono) ─┤
-   │                                      │  trigger detector     │
-   │◄── suggestions (stream) ─────────────┤  suggester agents     │
-   │◄── memory diffs (SSE) ───────────────┘  memory + facts UI    │
-                                           SQLite (calls, usage)  ┘
+   │  └── 60s client secret ◄── POST /api/realtime/session
+   │
+   ├── each finalized utterance + a snapshot of the call's memory
+   │        ──► POST /api/coach/turn ──► suggester ∥ memory extractor ──► panel agent
+   │◄── streamed patches (suggestion, memory.patch, panel.patch) ───────────┘
+   └── coach chat ──► POST /api/chat
 ```
 
-- **`apps/web`**: Next.js 14 (App Router), Tailwind, Vercel AI SDK hooks, PostHog analytics.
-- **`apps/agent`**: Bun + Hono API with a WebSocket coach channel and SSE stream. Runs the coaching pipeline (trigger detection → suggestion → memory extraction → UI facts) through the Vercel AI Gateway.
-- **`packages/types`**: shared Zod schemas and TypeScript types, so the wire format is checked on both sides.
-- **`fixtures/`**: scripted calls and pre-call briefs used by the replay mode and tests.
+- **The server is stateless.** The browser owns the call's memory (the same `MemoryStore` code runs on both sides). Each turn it sends a snapshot; the server streams back patches and the browser applies them. Nothing is stored server-side, which is what lets this run on Vercel Functions.
+- **Audio never touches the backend.** The browser talks to OpenAI directly with a short-lived client secret, and the coach only reacts after the prospect's audio has finished playing.
+- **Every memory fact keeps an anchor** back to the transcript line it came from.
 
-Design notes worth skimming: audio never touches the backend (the browser talks to OpenAI directly with a 60-second client secret), the coach only fires after the prospect's audio has finished playing, and every memory fact keeps an anchor back to the transcript.
+Code map: `src/app` (pages and API routes), `src/server` (LLM agents and prompts), `src/lib/memory` (memory store, shared by browser and server), `src/lib/coach` (client hook and wire protocol), `packages/types` (shared Zod schemas), `fixtures/` (pre-call briefs and sample transcripts).
+
+### Models
+
+| Job | Model | Via |
+|---|---|---|
+| Prospect voice | `gpt-realtime-2.1` | OpenAI Realtime |
+| Mic transcription | `gpt-live-transcribe` | OpenAI Realtime |
+| Live suggestions | `gpt-6-luna` (reasoning off) | Vercel AI Gateway |
+| Memory extractor and panel | `gpt-6-luna` (reasoning off) | Vercel AI Gateway |
+| Chat coach | `gpt-oss-120b` | Vercel AI Gateway |
+
+All overridable with env vars; see `apps/web/.env.example`.
 
 ## Run it locally
 
-Requires [Bun](https://bun.sh) 1.x, an OpenAI API key, and a Vercel AI Gateway token.
+Requires [Bun](https://bun.sh) 1.x, plus two API keys: OpenAI and the Vercel AI Gateway.
 
 ```bash
 bun install
-
-cp apps/agent/.env.example apps/agent/.env   # add OPENAI_API_KEY and VERCEL_AI_GATEWAY_TOKEN
-cp apps/web/.env.example apps/web/.env.local # add NEXT_PUBLIC_POSTHOG_TOKEN (optional)
-
-bun run dev          # web on :3000, agent on :3001
+cp apps/web/.env.example apps/web/.env.local   # fill in the two keys
+bun run dev                                    # http://localhost:3000
 ```
 
-Open <http://localhost:3000>.
+Other scripts: `bun run typecheck`, `bun run test`, `bun run build`.
 
-Other scripts: `bun run typecheck`, `bun run test`, `bun run smoke`.
+## Deploying (Vercel)
 
-## Deploying
-
-| Service | Where | Required env |
-|---|---|---|
-| Web | Vercel (root dir `apps/web`) | `NEXT_PUBLIC_AGENT_URL` (the build **fails** if it's missing), `NEXT_PUBLIC_POSTHOG_TOKEN` |
-| Agent | Railway (`railway.toml`) | `OPENAI_API_KEY`, `VERCEL_AI_GATEWAY_TOKEN`, `WEB_ORIGIN` (the agent **refuses to start** in production without it) |
+1. Import the repo in Vercel and set the **Root Directory** to `apps/web`.
+2. Add the env vars from `apps/web/.env.example` (`OPENAI_API_KEY`, `VERCEL_AI_GATEWAY_TOKEN`).
+3. Add the **Upstash Redis** integration from the Vercel Marketplace so the daily caps persist.
 
 ### Cost protection
 
-The voice demo bills real money per call, so the agent enforces:
+The voice demo bills real money per call, so every API route enforces:
 
-- an `Origin` allow-list (`WEB_ORIGIN`, comma-separated) on `/realtime/session`
-- a per-IP daily cap (`REALTIME_IP_DAILY_CAP`, default 5) and a global daily cap (`REALTIME_DAILY_SESSION_CAP`, default 150)
+- a same-origin check
+- per-IP and global daily caps (`REALTIME_IP_DAILY_CAP` default 5 sessions, `REALTIME_DAILY_SESSION_CAP` default 150, plus separate caps for coach turns and chat)
 - a 5-minute maximum call length, enforced client-side
-- the scripted-replay endpoint has its own per-IP and daily-spend limits
 
-Also set a hard monthly spend limit on the OpenAI key itself.
+Also set a hard monthly spend limit on the OpenAI key and a budget on the AI Gateway.
 
 ## Project docs
 

@@ -10,3 +10,4 @@ apps/agent/transcripts/
 /tmp/
 .gstack/
 .vercel
+*.tsbuildinfo

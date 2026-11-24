@@ -4,9 +4,12 @@ import posthog from 'posthog-js';
 
 export function PostCallRating({
   personaName,
+  leftUnasked = [],
   onDone,
 }: {
   personaName: string;
+  /** Questions Atlas suggested that were never asked or answered on the call. */
+  leftUnasked?: string[];
   onDone: () => void;
 }) {
   const [hovered, setHovered] = useState(0);
@@ -46,6 +49,17 @@ export function PostCallRating({
             Ratings help Atlas improve.
           </p>
         </div>
+
+        {leftUnasked.length > 0 && (
+          <section aria-label="Left unasked" className="rounded-xl bg-accent-soft px-4 py-3 text-left">
+            <h2 className="text-xs font-semibold text-accent">Left unasked</h2>
+            <ul className="mt-1.5 space-y-1.5">
+              {leftUnasked.map((q) => (
+                <li key={q} className="text-sm leading-snug text-fg-primary text-pretty">{q}</li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <div
           className="flex justify-center gap-3"
