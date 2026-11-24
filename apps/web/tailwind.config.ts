@@ -29,6 +29,9 @@ const config: Config = {
           timeline: '#6D28D9',
         },
         signal: {
+          // Certainty that is heard but not confirmed. Same hue as qual.need
+          // today, but its own role so "Unconfirmed" isn't tied to Need.
+          caution: '#B45309',
           positive: '#047857',
           negative: '#B91C1C',
         },

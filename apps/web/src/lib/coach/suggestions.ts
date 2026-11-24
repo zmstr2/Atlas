@@ -49,6 +49,8 @@ export const EXPIRE_AFTER_TURNS = 8;
 export const EXPIRE_AFTER_MS = 5 * 60 * 1000;
 /** How long a just-covered item lingers as "Covered" before it fades. */
 export const COVERED_FLASH_MS = 1400;
+/** How long "Dropped · Undo" / "Asked · Undo" stays offered. */
+export const UNDO_MS = 4000;
 
 const isLive = (s: CoachSuggestion) => s.status === 'current' || s.status === 'open';
 const parkable = (s: CoachSuggestion) => s.kind === 'question';
@@ -115,6 +117,24 @@ export function promote(list: CoachSuggestion[], id: string, now: number): Coach
   });
 }
 
+/**
+ * Bring a settled item back (Undo, or restoring from history). It becomes
+ * current if nothing is; otherwise it parks, taking its topic's slot.
+ */
+export function restore(list: CoachSuggestion[], id: string, now: number): CoachSuggestion[] {
+  const target = list.find((s) => s.id === id);
+  if (!target || isLive(target)) return list;
+  const hasCurrent = list.some((s) => s.status === 'current');
+  const status: SuggestionStatus = hasCurrent ? 'open' : 'current';
+  return list.map((s) => {
+    if (s.id === id) return { ...s, status, settledAt: undefined, ts: status === 'open' ? s.ts : now };
+    if (status === 'open' && s.status === 'open' && sameTopic(s.topic, target.topic)) {
+      return { ...s, status: 'superseded' as const, settledAt: now };
+    }
+    return s;
+  });
+}
+
 export type SuggestionView = {
   /** The one thing to read right now. */
   current: CoachSuggestion | null;
@@ -124,6 +144,8 @@ export type SuggestionView = {
   covering: CoachSuggestion[];
   /** Everything else, newest first. */
   history: CoachSuggestion[];
+  /** The item the rep just dropped or marked asked, while Undo is still offered. */
+  undoable: CoachSuggestion | null;
 };
 
 export type ViewContext = {
@@ -170,7 +192,13 @@ export function deriveView(list: CoachSuggestion[], ctx: ViewContext): Suggestio
   // If nothing is current (e.g. it was just covered), surface the newest parked question.
   if (!current && open.length) current = open.shift()!;
 
-  return { current, tray: open, covering, history: history.sort(byNewest) };
+  history.sort(byNewest);
+  const undoable =
+    history.find(
+      (s) => (s.status === 'dropped' || s.status === 'asked') && s.settledAt !== undefined && ctx.now - s.settledAt < UNDO_MS,
+    ) ?? null;
+
+  return { current, tray: open, covering, history, undoable };
 }
 
 /** What the model is told is still open: the current question plus the tray. */

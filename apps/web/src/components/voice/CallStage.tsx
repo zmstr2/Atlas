@@ -77,7 +77,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
     window.addEventListener('pointerup', onUp);
   };
 
-  const { view, now, markAsked, dropSuggestion, promoteSuggestion, notes, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall: coachEndCall, getChatContext } = useCoach({ callId, personaId });
+  const { view, now, markAsked, dropSuggestion, promoteSuggestion, restoreSuggestion, notes, memory, factsUI, errors, sendTranscript, sendPersonaToolCall, endCall: coachEndCall, getChatContext } = useCoach({ callId, personaId });
 
   useEffect(() => {
     let cancelled = false;
@@ -277,6 +277,7 @@ export function CallStage({ personaId, callId, onEnd }: CallStageProps) {
               onAsked={markAsked}
               onDrop={dropSuggestion}
               onPromote={promoteSuggestion}
+              onRestore={restoreSuggestion}
               className="w-full bg-white"
               redundantPhrases={[
                 session?.persona.displayName ?? '',

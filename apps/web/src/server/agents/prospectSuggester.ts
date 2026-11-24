@@ -66,8 +66,8 @@ If you cannot name all three concretely, shouldFire=false. Greetings, transition
 - agent: always 'prospect_suggester'.
 - play: closest label from the taxonomy below — used for analytics, not for firing.
 - groundedInUtteranceIds + groundedInAnchorTurnIds: cite the evidence named in (b).
-- say: the exact words the rep could say next, as ONE natural spoken sentence, ≤18 words, using the prospect's own specifics. A question when possible ("If Dana needs payback in nine months, what would you want to see first?"). Never advice about advice ("Correct the mismatch…", "Clarify the budget…"). Empty string when shouldFire=false.
-- why: ≤12 words on what this gets the rep. Empty string when shouldFire=false.
+- say: the exact words the rep could say next, as ONE natural spoken sentence, ≤18 words, using the prospect's own specifics. Ask ONE thing: never join two questions with \"and\" or \"or\". A question when possible ("If Dana needs payback in nine months, what would you want to see first?"). Never advice about advice ("Correct the mismatch…", "Clarify the budget…"). Empty string when shouldFire=false.
+- why: ≤8 words on what this gets the rep. Empty string when shouldFire=false.
 - kind: 'question' when \`say\` asks something that stays worth asking later if the rep skips it now; 'note' for a reaction, correction or warning tied to this moment.
 - coveredIds: ids from OPEN SUGGESTIONS whose question the rep has now asked or the prospect has now answered (judge from the NEW utterance and the recent turns). Use [] when none. Required even when shouldFire=false.
 

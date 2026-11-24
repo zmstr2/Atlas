@@ -13,7 +13,9 @@ import {
   markCovered,
   openForModel,
   promote as promoteInList,
+  restore as restoreInList,
   settle,
+  UNDO_MS,
   type CoachSuggestion,
   type SuggestionView,
 } from './suggestions';
@@ -36,6 +38,8 @@ export type UseCoachReturn = {
   markAsked: (id: string) => void;
   dropSuggestion: (id: string) => void;
   promoteSuggestion: (id: string) => void;
+  /** Undo a Drop/Asked, or bring an item back from history. */
+  restoreSuggestion: (id: string) => void;
   /** Briefing and call events. Shown in the chat. */
   notes: CoachNote[];
   memory: MeetingMemory | null;
@@ -80,6 +84,7 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
   const bumpClockSoon = useCallback(() => {
     setNow(Date.now());
     setTimeout(() => setNow(Date.now()), COVERED_FLASH_MS + 60);
+    setTimeout(() => setNow(Date.now()), UNDO_MS + 60);
   }, []);
 
   const view = useMemo(
@@ -258,6 +263,11 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
     setAll((prev) => promoteInList(prev, id, Date.now()));
   }, []);
 
+  const restoreSuggestion = useCallback((id: string) => {
+    setAll((prev) => restoreInList(prev, id, Date.now()));
+    setNow(Date.now());
+  }, []);
+
   const getChatContext = useCallback((): ChatContext => ({
     personaId: (personaId ?? 'mia') as PersonaId,
     memory: storeRef.current.snapshot,
@@ -266,7 +276,7 @@ export function useCoach(opts: { callId: string | null; personaId: PersonaId | n
   }), [personaId]);
 
   return {
-    view, now, markAsked, dropSuggestion, promoteSuggestion,
+    view, now, markAsked, dropSuggestion, promoteSuggestion, restoreSuggestion,
     notes, memory, factsUI, errors,
     sendTranscript, sendPersonaToolCall, endCall, getChatContext,
   };

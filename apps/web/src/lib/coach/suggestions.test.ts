@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  addSuggestion, ageLabel, deriveView, markCovered, openForModel, promote, settle,
-  COVERED_FLASH_MS, EXPIRE_AFTER_MS, MAX_OPEN, type CoachSuggestion,
+  addSuggestion, ageLabel, deriveView, markCovered, openForModel, promote, restore, settle,
+  COVERED_FLASH_MS, EXPIRE_AFTER_MS, MAX_OPEN, UNDO_MS, type CoachSuggestion,
 } from './suggestions';
 
 const NONE = () => false;
@@ -96,6 +96,25 @@ describe('suggestion lifecycle', () => {
     expect(addSuggestion(l, sug({ id: 'a' }), 2)).toBe(l);
     l = addSuggestion(l, sug({ id: 'b', kind: 'note', topic: 'authority' }), 2);
     expect(openForModel(deriveView(l, ctx())).map((o) => o.id)).toEqual(['a']);
+  });
+
+  test('Undo is offered briefly after Drop or Asked, and restores the item', () => {
+    let l = addSuggestion([], sug({ id: 'a', topic: 'budget' }), 1);
+    l = addSuggestion(l, sug({ id: 'b', topic: 'authority' }), 2);
+    const dropped = settle(l, 'b', 'dropped', 10_000);
+    expect(deriveView(dropped, ctx({ now: 10_000 + 100 })).undoable?.id).toBe('b');
+    expect(deriveView(dropped, ctx({ now: 10_000 + UNDO_MS + 1 })).undoable).toBeNull();
+    // Undo puts the dropped current suggestion back exactly where it was.
+    const undone = restore(dropped, 'b', 10_200);
+    const v = deriveView(undone, ctx({ now: 10_300 }));
+    expect(v.current?.id).toBe('b');
+    expect(v.tray.map((s) => s.id)).toEqual(['a']);
+  });
+
+  test('restoring from history becomes current when nothing else is', () => {
+    let l = addSuggestion([], sug({ id: 'a', topic: 'budget' }), 1);
+    l = settle(l, 'a', 'asked', 5);
+    expect(deriveView(restore(l, 'a', 6), ctx({ now: 7 })).current?.id).toBe('a');
   });
 
   test('ageLabel is coarse', () => {

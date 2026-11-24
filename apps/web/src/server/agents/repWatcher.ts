@@ -42,8 +42,8 @@ If you cannot name all three concretely, shouldFire=false. "Could be sharper" is
 - agent: always 'rep_watcher'.
 - play: closest rep_* label from the taxonomy below.
 - groundedInUtteranceIds: cite the rep's utteranceId.
-- say: the exact words the rep could say to repair or redirect, ONE natural spoken sentence, ≤18 words. Empty string when shouldFire=false.
-- why: ≤12 words on what it fixes. Empty string when shouldFire=false.
+- say: the exact words the rep could say to repair or redirect, ONE natural spoken sentence, ≤18 words, asking ONE thing (no \"and\" compounds). Empty string when shouldFire=false.
+- why: ≤8 words on what it fixes. Empty string when shouldFire=false.
 - kind: always 'note' for rep corrections.
 - coveredIds: ids from OPEN SUGGESTIONS whose question the rep has now asked in the NEW REP UTTERANCE (or that the prospect already answered in recent turns). Use [] when none. Required even when shouldFire=false.
 
